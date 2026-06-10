@@ -28,12 +28,19 @@ export class DialogueBox {
       color: "#a78164"
     }).setDepth(81).setOrigin(1, 1);
 
-    this.group.addMultiple([this.text, this.prompt]);
+    this.skipButton = this.scene.add.text(width * 0.92, height * 0.66, "[ESC] Skip", {
+      fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(12, Math.floor(width / 96))}px`,
+      color: "#a78164"
+    }).setDepth(81).setOrigin(1, 1).setAlpha(0);
+
+    this.group.addMultiple([this.text, this.prompt, this.skipButton]);
     this.hide();
 
     this.scene.input.on("pointerdown", () => this.advance());
     this.scene.input.keyboard.on("keydown-SPACE", () => this.advance());
     this.scene.input.keyboard.on("keydown-ENTER", () => this.advance());
+    this.scene.input.keyboard.on("keydown-ESC", () => this.skip());
   }
 
   show(message, onClose = null) {
@@ -48,6 +55,7 @@ export class DialogueBox {
     this.panel.setVisible(true);
     this.text.setVisible(true);
     this.prompt.setVisible(true);
+    this.skipButton.setAlpha(1);
     this.drawPanel();
   }
 
@@ -56,6 +64,7 @@ export class DialogueBox {
     if (this.panel) this.panel.setVisible(false);
     if (this.text) this.text.setVisible(false);
     if (this.prompt) this.prompt.setVisible(false);
+    if (this.skipButton) this.skipButton.setAlpha(0);
   }
 
   advance() {
@@ -68,6 +77,13 @@ export class DialogueBox {
       return true;
     }
 
+    this.hide();
+    if (this.onClose) this.onClose();
+    return true;
+  }
+
+  skip() {
+    if (!this.visible) return false;
     this.hide();
     if (this.onClose) this.onClose();
     return true;

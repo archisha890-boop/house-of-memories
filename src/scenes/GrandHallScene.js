@@ -33,7 +33,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#030202");
     this.cameras.main.fadeIn(1200, 0, 0, 0);
 
-    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: false, thunder: true, creaks: true });
+    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: true, creaks: true });
     this.audio.start();
     this.audio.fadeIn();
 
@@ -44,6 +44,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.createPedestalHotspot();
     this.createGateHotspot();
     this.createRoomHotspots();
+    this.createVignette();
 
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
@@ -73,7 +74,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#030202");
     this.cameras.main.fadeIn(1400, 0, 0, 0);
 
-    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: false, thunder: true, creaks: true });
+    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: true, creaks: true });
     this.audio.start();
     this.audio.fadeIn();
 
@@ -82,6 +83,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.createOverlays();
     this.createGateHotspot();
     this.createRoomHotspots();
+    this.createVignette();
 
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
@@ -544,13 +546,93 @@ export class GrandHallScene extends Phaser.Scene {
       observatory: this.add.rectangle(width * 0.77, height * 0.64, width * 0.14, height * 0.18, 0xffffff, 0).setDepth(40),
       bedroom: this.add.rectangle(width * 0.91, height * 0.64, width * 0.14, height * 0.18, 0xffffff, 0).setDepth(40)
     };
+
+    this.roomLabels = {
+      library: this.add.text(width * 0.17, height * 0.18, "Library", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(14, Math.floor(width / 72))}px`,
+        color: "#d8b28d",
+        backgroundColor: "#0a0808",
+        padding: { x: 8, y: 4 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0),
+      gallery: this.add.text(width * 0.83, height * 0.18, "Gallery", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(14, Math.floor(width / 72))}px`,
+        color: "#d8b28d",
+        backgroundColor: "#0a0808",
+        padding: { x: 8, y: 4 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0),
+      kitchen: this.add.text(width * 0.09, height * 0.54, "Kitchen", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(13, Math.floor(width / 78))}px`,
+        color: "#a9867c",
+        backgroundColor: "#0a0808",
+        padding: { x: 6, y: 3 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0),
+      basement: this.add.text(width * 0.23, height * 0.54, "Basement", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(13, Math.floor(width / 78))}px`,
+        color: "#a9867c",
+        backgroundColor: "#0a0808",
+        padding: { x: 6, y: 3 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0),
+      observatory: this.add.text(width * 0.77, height * 0.54, "Observatory", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(13, Math.floor(width / 78))}px`,
+        color: "#a9867c",
+        backgroundColor: "#0a0808",
+        padding: { x: 6, y: 3 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0),
+      bedroom: this.add.text(width * 0.91, height * 0.54, "Bedroom", {
+        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+        fontSize: `${Math.max(13, Math.floor(width / 78))}px`,
+        color: "#a9867c",
+        backgroundColor: "#0a0808",
+        padding: { x: 6, y: 3 }
+      }).setOrigin(0.5).setDepth(41).setAlpha(0)
+    };
+  }
+
+  createVignette() {
+    const { width, height } = this.scale;
+    const g = this.add.graphics().setDepth(50);
+
+    g.fillStyle(0x000000, 0.3);
+    g.fillRect(0, 0, width, height);
+
+    g.fillStyle(0x000000, 0.6);
+    g.fillRect(0, 0, width, height * 0.1);
+    g.fillRect(0, height * 0.9, width, height * 0.1);
+    g.fillRect(0, 0, width * 0.06, height);
+    g.fillRect(width * 0.94, 0, width * 0.06, height);
+
+    g.fillStyle(0x1a0a12, 0.13);
+    g.fillRect(0, 0, width, height);
   }
 
   enableRooms() {
     Object.entries(this.roomHotspots).forEach(([name, hotspot]) => {
       hotspot.setInteractive({ useHandCursor: true })
-        .on("pointerover", () => { this.hoveredRoom = name; })
-        .on("pointerout", () => { if (this.hoveredRoom === name) this.hoveredRoom = null; })
+        .on("pointerover", () => {
+          this.hoveredRoom = name;
+          if (this.roomLabels[name]) {
+            this.tweens.add({
+              targets: this.roomLabels[name],
+              alpha: 1,
+              duration: 200
+            });
+          }
+        })
+        .on("pointerout", () => {
+          if (this.hoveredRoom === name) this.hoveredRoom = null;
+          if (this.roomLabels[name]) {
+            this.tweens.add({
+              targets: this.roomLabels[name],
+              alpha: 0,
+              duration: 200
+            });
+          }
+        })
         .on("pointerdown", () => this.enterRoom(name));
     });
   }

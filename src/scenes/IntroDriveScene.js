@@ -40,7 +40,7 @@ this.letterOpen = false;
 this.cameras.main.setBackgroundColor("#030405");
 this.cameras.main.fadeIn(2200, 0, 0, 0);
 
-this.audio = new SceneAudio(this);
+this.audio = new SceneAudio(this, { rain: true, piano: true, wind: true, thunder: true, musicBox: false });
 
 if (window.__houseIntroAudioArmed) {
 window.__houseIntroAudioArmed = false;
@@ -55,6 +55,7 @@ this.audio.fadeIn();
 
 this.createLayers();
 this.createInteractables();
+this.createVignette();
 
 this.dialogue = new DialogueBox(this);
 this.dialogue.create();
@@ -67,7 +68,7 @@ this.input.keyboard.on("keydown-ESC", () => {
 this.closeLetter();
 });
 
-
+this.time.delayedCall(3000, () => this.showObjectiveHint());
 
 this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
 if (this.audio) this.audio.destroy();
@@ -144,7 +145,7 @@ height * 0.17,
 this.hint = this.add.text(
 width * 0.03,
 height * 0.92,
-"[L] Letter    [M] Mirror    [W] Windshield",
+"[L] Read Letter    [M] Check Mirror    [W] Look Outside",
 {
 fontFamily: "IM Fell English SC, Georgia, Times New Roman, serif",
 fontSize: `${Math.max(16, Math.floor(width / 80))}px`,
@@ -509,6 +510,51 @@ this.letterOpen = false;
   openFocusedInteraction() {
     if (this.focusMode === "mirror") this.inspectMirror();
     else this.inspectWindshield();
+  }
+
+  createVignette() {
+    const { width, height } = this.scale;
+    const g = this.add.graphics().setDepth(50);
+
+    g.fillStyle(0x000000, 0.25);
+    g.fillRect(0, 0, width, height);
+
+    g.fillStyle(0x000000, 0.55);
+    g.fillRect(0, 0, width, height * 0.1);
+    g.fillRect(0, height * 0.9, width, height * 0.1);
+    g.fillRect(0, 0, width * 0.06, height);
+    g.fillRect(width * 0.94, 0, width * 0.06, height);
+
+    g.fillStyle(0x1a0a12, 0.12);
+    g.fillRect(0, 0, width, height);
+  }
+
+  showObjectiveHint() {
+    const { width, height } = this.scale;
+    const hint = this.add.text(width / 2, height * 0.15, "Read the letter on the passenger seat", {
+      fontFamily: "IM Fell English SC, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(14, Math.floor(width / 72))}px`,
+      color: "#c9a87a",
+      backgroundColor: "#0a0808",
+      padding: { x: 12, y: 8 },
+      shadow: { offsetX: 2, offsetY: 2, color: "#120608", blur: 0, fill: true }
+    }).setOrigin(0.5).setDepth(65).setAlpha(0);
+
+    this.tweens.add({
+      targets: hint,
+      alpha: 1,
+      duration: 800,
+      ease: "Sine.easeOut"
+    });
+
+    this.tweens.add({
+      targets: hint,
+      alpha: 0,
+      duration: 600,
+      delay: 5000,
+      ease: "Sine.easeIn",
+      onComplete: () => hint.destroy()
+    });
   }
 
   showArrivalTitle() {

@@ -110,13 +110,18 @@ export class MainMenuScene extends Phaser.Scene {
   createVignette() {
     const { width, height } = this.scale;
     const g = this.add.graphics().setDepth(30);
-    g.fillStyle(0x000000, 0.18);
+
+    g.fillStyle(0x000000, 0.35);
     g.fillRect(0, 0, width, height);
-    g.fillStyle(0x000000, 0.45);
-    g.fillRect(0, 0, width, height * 0.08);
-    g.fillRect(0, height * 0.9, width, height * 0.1);
-    g.fillRect(0, 0, width * 0.055, height);
-    g.fillRect(width * 0.945, 0, width * 0.055, height);
+
+    g.fillStyle(0x000000, 0.65);
+    g.fillRect(0, 0, width, height * 0.12);
+    g.fillRect(0, height * 0.88, width, height * 0.12);
+    g.fillRect(0, 0, width * 0.08, height);
+    g.fillRect(width * 0.92, 0, width * 0.08, height);
+
+    g.fillStyle(0x1a0a12, 0.15);
+    g.fillRect(0, 0, width, height);
   }
 
   createTitle() {
@@ -216,6 +221,7 @@ export class MainMenuScene extends Phaser.Scene {
       text.setColor(selected ? "#f4d7b7" : "#b99a8d");
       text.setShadow(selected ? 3 : 1, selected ? 3 : 1, selected ? "#5b101a" : "#120608", 0, true);
       text.setAlpha(selected ? 1 : 0.78);
+      text.setScale(selected ? 1.05 : 1);
     });
 
     this.drawActiveMarker();

@@ -69,7 +69,7 @@ export class LibraryScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#000000");
     this.cameras.main.fadeIn(1500, 0, 0, 0);
 
-    this.audio = new SceneAudio(this, { rain: true, piano: true, wind: false, thunder: true, creaks: false });
+    this.audio = new SceneAudio(this, { rain: true, piano: true, wind: true, thunder: true, creaks: true });
     this.audio.start();
     this.audio.fadeIn();
 
@@ -79,6 +79,7 @@ export class LibraryScene extends Phaser.Scene {
     this.createBookHotspot();
     this.createPageHotspots();
     this.createInventory();
+    this.createVignette();
 
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
@@ -223,6 +224,23 @@ export class LibraryScene extends Phaser.Scene {
       width * BOOK_HOTSPOT.w * 1.1,
       height * BOOK_HOTSPOT.h * 0.75
     );
+  }
+
+  createVignette() {
+    const { width, height } = this.scale;
+    const g = this.add.graphics().setDepth(50);
+
+    g.fillStyle(0x000000, 0.32);
+    g.fillRect(0, 0, width, height);
+
+    g.fillStyle(0x000000, 0.62);
+    g.fillRect(0, 0, width, height * 0.1);
+    g.fillRect(0, height * 0.9, width, height * 0.1);
+    g.fillRect(0, 0, width * 0.06, height);
+    g.fillRect(width * 0.94, 0, width * 0.06, height);
+
+    g.fillStyle(0x1a0a12, 0.15);
+    g.fillRect(0, 0, width, height);
   }
 
   openBookView() {

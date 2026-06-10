@@ -64,7 +64,7 @@ export class GalleryScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#000000");
     this.cameras.main.fadeIn(1500, 0, 0, 0);
 
-    this.audio = new SceneAudio(this, { rain: false, piano: false, wind: false, thunder: false, musicBox: true });
+    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: true, creaks: true, musicBox: true });
     this.audio.start();
     this.audio.fadeIn();
 
@@ -74,6 +74,7 @@ export class GalleryScene extends Phaser.Scene {
     this.createFrameHotspots();
     this.createInventory();
     this.createClockDisplay();
+    this.createVignette();
 
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
@@ -96,6 +97,14 @@ export class GalleryScene extends Phaser.Scene {
       logProgressEvent("SCENE END", { scene: "GalleryScene", stage: this.stage, petals: this.rosePetalCount, crests: this.memoryCrestCount });
       this.autosave();
       if (this.audio) this.audio.destroy();
+      if (this.dialogue) this.dialogue.hide();
+      if (this.inventoryText) this.inventoryText.destroy();
+      if (this.clockText) this.clockText.destroy();
+      if (this.frameGlow) this.frameGlow.clear();
+      if (this.interactGlow) this.interactGlow.clear();
+      if (this.warmOverlay) this.warmOverlay.destroy();
+      if (this.particles) this.particles.destroy();
+      this.scale.off("resize", this.resizeWarmOverlay, this);
     });
   }
 
@@ -394,6 +403,23 @@ export class GalleryScene extends Phaser.Scene {
         .on("pointerdown", () => this.collectFragment(Number(id)));
       this.fragmentHotspots.push(rect);
     });
+  }
+
+  createVignette() {
+    const { width, height } = this.scale;
+    const g = this.add.graphics().setDepth(50);
+
+    g.fillStyle(0x000000, 0.3);
+    g.fillRect(0, 0, width, height);
+
+    g.fillStyle(0x000000, 0.6);
+    g.fillRect(0, 0, width, height * 0.1);
+    g.fillRect(0, height * 0.9, width, height * 0.1);
+    g.fillRect(0, 0, width * 0.06, height);
+    g.fillRect(width * 0.94, 0, width * 0.06, height);
+
+    g.fillStyle(0x1a0a12, 0.13);
+    g.fillRect(0, 0, width, height);
   }
 
   updateFrameGlow() {
@@ -1013,13 +1039,13 @@ export class GalleryScene extends Phaser.Scene {
   revealCrest() {
     const { width, height } = this.scale;
     const view = this.openCloseupView();
-    const crest = this.add.image(width / 2, height * 0.4, "crestOfMemories").setOrigin(0.5);
+    const crest = this.add.image(width / 2, height * 0.4, "crest of memories").setOrigin(0.5);
     crest.setScale(this.imageScale(crest, 0.28, 0.34)).setAlpha(0);
     view.add(crest);
     this.tweens.add({ targets: crest, alpha: 1, duration: 900 });
 
     this.time.delayedCall(1200, () => {
-      const acquired = this.add.image(width / 2, height * 0.58, "crestAcquired").setOrigin(0.5);
+      const acquired = this.add.image(width / 2, height * 0.58, "crest acquired").setOrigin(0.5);
       acquired.setScale(this.imageScale(acquired, 0.26, 0.32)).setAlpha(0);
       view.add(acquired);
       this.tweens.add({ targets: acquired, alpha: 1, duration: 700 });
@@ -1096,6 +1122,7 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   returnToGrandHall() {
+    this.autosave();
     this.playDialogueSequence(["The house remembers."], () => {
       this.cameras.main.fadeOut(1400, 0, 0, 0);
       this.time.delayedCall(1500, () => {

@@ -26,7 +26,7 @@ export class GraveyardScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#020304");
     this.cameras.main.fadeIn(1400, 0, 0, 0);
 
-    this.audio = new SceneAudio(this, { piano: false, wind: true, thunder: true });
+    this.audio = new SceneAudio(this, { piano: false, wind: true, thunder: true, creaks: true, musicBox: true });
     this.audio.start();
     this.audio.fadeIn();
 
@@ -36,6 +36,7 @@ export class GraveyardScene extends Phaser.Scene {
     this.createDoorHotspot();
     this.createInventory();
     this.createObjective();
+    this.createVignette();
 
     this.flash = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0xe8e3d8, 0)
       .setOrigin(0)
@@ -180,8 +181,10 @@ export class GraveyardScene extends Phaser.Scene {
   setGhostHover(hovering) {
     if (!this.ghostVisible || !this.ghost) return;
     this.ghostHovering = hovering;
-    this.ghost.setAlpha(hovering ? 0.94 : 0.78);
-    this.ghostGlow.setAlpha(hovering ? 0.5 : 0.28);
+    this.ghost.setAlpha(hovering ? 1 : 0.78);
+    this.ghostGlow.setAlpha(hovering ? 0.7 : 0.28);
+    this.ghost.setScale(this.getGhostScale() * (hovering ? 1.05 : 1));
+    this.ghostGlow.setScale(this.ghost.scaleX * 1.28);
   }
 
   updateGhostGlow() {
@@ -371,6 +374,7 @@ export class GraveyardScene extends Phaser.Scene {
   setInventoryHover(hovering) {
     this.inventoryHovering = hovering;
     this.inventoryButton.setColor(hovering ? "#ffe0a3" : "#e5c08a");
+    this.inventoryButton.setScale(hovering ? 1.05 : 1);
   }
 
   startInventoryPulse(urgent = false) {
@@ -441,6 +445,29 @@ export class GraveyardScene extends Phaser.Scene {
 
   setDoorHover(hovering) {
     this.doorHovering = hovering;
+    if (hovering && this.doorNeedsAttention) {
+      this.doorGlow.clear();
+      this.doorGlow.fillStyle(0xffd56a, 0.3);
+      const { width, height } = this.scale;
+      this.doorGlow.fillEllipse(width * 0.5, height * 0.5, width * 0.24, height * 0.22);
+    }
+  }
+
+  createVignette() {
+    const { width, height } = this.scale;
+    const g = this.add.graphics().setDepth(50);
+
+    g.fillStyle(0x000000, 0.28);
+    g.fillRect(0, 0, width, height);
+
+    g.fillStyle(0x000000, 0.58);
+    g.fillRect(0, 0, width, height * 0.1);
+    g.fillRect(0, height * 0.9, width, height * 0.1);
+    g.fillRect(0, 0, width * 0.06, height);
+    g.fillRect(width * 0.94, 0, width * 0.06, height);
+
+    g.fillStyle(0x1a0a12, 0.14);
+    g.fillRect(0, 0, width, height);
   }
 
   updateManorGlow() {
