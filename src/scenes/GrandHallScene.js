@@ -611,7 +611,10 @@ export class GrandHallScene extends Phaser.Scene {
   }
 
   enableRooms() {
+    const progress = getHouseProgress();
     Object.entries(this.roomHotspots).forEach(([name, hotspot]) => {
+      if (name === "bedroom" && !progress.galleryComplete) return;
+
       hotspot.setInteractive({ useHandCursor: true })
         .on("pointerover", () => {
           this.hoveredRoom = name;
@@ -697,6 +700,20 @@ export class GrandHallScene extends Phaser.Scene {
       }
       this.cameras.main.fadeOut(900, 0, 0, 0);
       this.time.delayedCall(950, () => this.scene.start("GalleryScene"));
+      return;
+    }
+
+    if (name === "bedroom") {
+      if (!progress.galleryComplete) {
+        this.playDialogueSequence(["The bedroom can wait.", "The gallery comes first."]);
+        return;
+      }
+      if (progress.bedroomComplete) {
+        this.playDialogueSequence(["The bedroom rests in peace.", "Every memory has been found."]);
+        return;
+      }
+      this.cameras.main.fadeOut(900, 0, 0, 0);
+      this.time.delayedCall(950, () => this.scene.start("BedroomScene"));
       return;
     }
 
