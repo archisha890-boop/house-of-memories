@@ -1039,13 +1039,13 @@ export class GalleryScene extends Phaser.Scene {
   revealCrest() {
     const { width, height } = this.scale;
     const view = this.openCloseupView();
-    const crest = this.add.image(width / 2, height * 0.4, "crest of memories").setOrigin(0.5);
+    const crest = this.add.image(width / 2, height * 0.4, "crestOfMoments").setOrigin(0.5);
     crest.setScale(this.imageScale(crest, 0.28, 0.34)).setAlpha(0);
     view.add(crest);
     this.tweens.add({ targets: crest, alpha: 1, duration: 900 });
 
     this.time.delayedCall(1200, () => {
-      const acquired = this.add.image(width / 2, height * 0.58, "crest acquired").setOrigin(0.5);
+      const acquired = this.add.image(width / 2, height * 0.58, "crestAcquired").setOrigin(0.5);
       acquired.setScale(this.imageScale(acquired, 0.26, 0.32)).setAlpha(0);
       view.add(acquired);
       this.tweens.add({ targets: acquired, alpha: 1, duration: 700 });
@@ -1071,6 +1071,7 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   playFinalScene() {
+    this.finalReturnStarted = false;
     this.playDialogueSequence([
       "You've always been good at finding ways to make memories."
     ], () => {
@@ -1089,9 +1090,9 @@ export class GalleryScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const ghost = this.add.image(width * 0.82, height * 0.45, "ghostGirlFront")
       .setOrigin(0.5, 1)
-      .setScale(this.imageScale(ghost, 0.2, 0.32))
       .setAlpha(0)
       .setDepth(20);
+    ghost.setScale(this.imageScale(ghost, 0.2, 0.32));
     this.tweens.add({ targets: ghost, alpha: 0.75, duration: 1400, hold: 2200 });
     this.tweens.add({
       targets: ghost,
@@ -1099,6 +1100,12 @@ export class GalleryScene extends Phaser.Scene {
       delay: 3600,
       duration: 1800,
       onComplete: () => {
+        ghost.destroy();
+        this.returnToGrandHall();
+      }
+    });
+    this.time.delayedCall(6200, () => {
+      if (!this.finalReturnStarted) {
         ghost.destroy();
         this.returnToGrandHall();
       }
@@ -1122,6 +1129,8 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   returnToGrandHall() {
+    if (this.finalReturnStarted) return;
+    this.finalReturnStarted = true;
     this.autosave();
     this.playDialogueSequence(["The house remembers."], () => {
       this.cameras.main.fadeOut(1400, 0, 0, 0);
@@ -1151,4 +1160,3 @@ export class GalleryScene extends Phaser.Scene {
     next();
   }
 }
-
