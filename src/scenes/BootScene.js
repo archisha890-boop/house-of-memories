@@ -77,10 +77,10 @@ export class BootScene extends Phaser.Scene {
       Promise.race([
         document.fonts.ready,
         new Promise((resolve) => window.setTimeout(resolve, 1200))
-      ]).then(() => this.scene.start("MainMenuScene"));
+      ]).then(() => this.scene.start("BedroomScene"));
       return;
     }
 
-    this.scene.start("MainMenuScene");
+    this.scene.start("BedroomScene");
   }
 }
