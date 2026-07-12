@@ -43,6 +43,32 @@ export class BootScene extends Phaser.Scene {
     this.load.image("mirrorFrameWoman", "assets/images/mirror frame woman.png");
     this.load.image("mirrorFrameWomanDisappear", "assets/images/mirror frame woman disappear.png");
     this.load.image("crestOfMoments", "assets/images/crest of memories.png");
+    this.load.image("bedroom", "assets/images/bedroom.png");
+    this.load.image("bedroomRestored", "assets/images/bedroom restored.png");
+    this.load.image("chest", "assets/images/chest.png");
+    this.load.image("chestOpened", "assets/images/chest opened.png");
+    this.load.image("crestOfUnderstanding", "assets/images/crest of understanding.png");
+    this.load.image("dreamList", "assets/images/dream list.png");
+    this.load.image("letter", "assets/images/letter.png");
+    this.load.image("plushie", "assets/images/plushie.png");
+    this.load.image("sketchbook", "assets/images/sketchbook.png");
+    this.load.image("kitchenUnrestored", "assets/images/kitchen unrestored.png");
+    this.load.image("kitchenRestored", "assets/images/restored kitchen.png");
+    this.load.image("counterCloseup", "assets/images/counter closeup.png");
+    this.load.image("pantryCloseup", "assets/images/Pantry closeup.png");
+    this.load.image("stoveCloseup", "assets/images/stove closeup.png");
+    this.load.image("recipeNote", "assets/images/recipe note.png");
+    this.load.image("cookedRoll", "assets/images/cooked roll.png");
+    this.load.image("memoryRolls", "assets/images/memory rolls.png");
+    this.load.image("basementDoor", "assets/images/Basement door.png");
+    this.load.image("basementUnrestored", "assets/images/Basement unrestored.png");
+    this.load.image("basementRestored", "assets/images/Basement restored.png");
+    this.load.image("brokenMirrorRoom", "assets/images/Broken mirror room.png");
+    this.load.image("restoredMirror", "assets/images/Mirror restored.png");
+    this.load.image("storageRoom", "assets/images/storage room.png");
+    this.load.image("floodedChamber", "assets/images/Flooded chamber.png");
+    this.load.image("mirrorFragment", "assets/images/Mirror fragment.png");
+    this.load.image("crestEndurance", "assets/images/Crest of endurance.png");
 
   }
 

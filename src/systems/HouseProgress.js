@@ -10,7 +10,9 @@ export function defaultProgress() {
     memoryCrests: 0,
     libraryComplete: false,
     galleryComplete: false,
+    bedroomComplete: false,
     chapterFourUnlocked: false,
+    chapterFiveUnlocked: false,
     gallery: {
       frames: [false, false, false, false, false, false],
       fragments: [false, false, false, false],
@@ -24,18 +26,44 @@ export function defaultProgress() {
     grandHall: {
       firstPetalCollected: false,
       hubUnlocked: false
+    },
+    bedroom: {
+      keepsakesCollected: {
+        book: false,
+        plushie: false,
+        sketchbook: false,
+        dreamList: false,
+        letter: false
+      },
+      plushiePetalCollected: false,
+      dreamListPetalCollected: false,
+      finalPetalCollected: false,
+      chestUnlocked: false,
+      crestCollected: false,
+      bedroomComplete: false
     }
   };
 }
 
 function normalizeProgress(saved = {}) {
   const defaults = defaultProgress();
+  const savedBedroom = saved.bedroom || {};
+  const savedKeepsakes = savedBedroom.keepsakesCollected || savedBedroom.keepsakes || {};
   return {
     ...defaults,
     ...saved,
     gallery: { ...defaults.gallery, ...(saved.gallery || {}) },
     library: { ...defaults.library, ...(saved.library || {}) },
-    grandHall: { ...defaults.grandHall, ...(saved.grandHall || {}) }
+    grandHall: { ...defaults.grandHall, ...(saved.grandHall || {}) },
+    bedroom: {
+      ...defaults.bedroom,
+      ...savedBedroom,
+      bedroomComplete: Boolean(savedBedroom.bedroomComplete || saved.bedroomComplete),
+      keepsakesCollected: {
+        ...defaults.bedroom.keepsakesCollected,
+        ...savedKeepsakes
+      }
+    }
   };
 }
 

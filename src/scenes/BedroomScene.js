@@ -2,123 +2,120 @@ import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
 
-const KEEPSAKE_HOTSPOTS = {
-  bed: { x: 0.5, y: 0.45, w: 0.3, h: 0.25, keepsake: "book" },
-  chair: { x: 0.25, y: 0.55, w: 0.2, h: 0.2, keepsake: "plushie" },
-  desk: { x: 0.75, y: 0.5, w: 0.2, h: 0.2, keepsake: "sketchbook" },
-  mirror: { x: 0.5, y: 0.35, w: 0.15, h: 0.2, keepsake: "dreamList" },
-  wardrobe: { x: 0.85, y: 0.45, w: 0.15, h: 0.3, keepsake: "letter" }
+const TEXTURE_KEYS = {
+  background: "bedroom",
+  restored: "bedroomRestored",
+  chest: "chest",
+  chestOpened: "chestOpened",
+  crest: "crestOfUnderstanding",
+  dreamList: "dreamList",
+  letter: "letter",
+  plushie: "plushie",
+  sketchbook: "sketchbook",
+  rosePetal: "rosePetal"
 };
 
-const CHEST_HOTSPOT = { x: 0.5, y: 0.65, w: 0.15, h: 0.15 };
+const KEEPSAKE_HOTSPOTS = {
+  bed: { x: 0.58, y: 0.47, w: 0.28, h: 0.2, keepsake: "book" },
+  chair: { x: 0.14, y: 0.53, w: 0.18, h: 0.28, keepsake: "plushie" },
+  desk: { x: 0.73, y: 0.44, w: 0.22, h: 0.22, keepsake: "sketchbook" },
+  mirror: { x: 0.64, y: 0.3, w: 0.12, h: 0.24, keepsake: "dreamList" },
+  wardrobe: { x: 0.9, y: 0.35, w: 0.17, h: 0.42, keepsake: "letter" }
+};
+
+const CHEST_HOTSPOT = { x: 0.39, y: 0.72, w: 0.28, h: 0.22 };
+const FINAL_PETAL_SPOT = { x: 0.62, y: 0.43 };
 
 export class BedroomScene extends Phaser.Scene {
   constructor() {
     super("BedroomScene");
     this.stage = "intro";
     this.hoveredHotspot = null;
-    this.keepsakesCollected = {
-      book: false,
-      plushie: false,
-      sketchbook: false,
-      dreamList: false,
-      letter: false
-    };
+    this.busy = false;
   }
 
   create() {
-    const progress = getHouseProgress();
-    logProgressEvent("SCENE START", { scene: "BedroomScene", progress });
-    this.progress = progress;
-    this.bedroomState = progress.bedroom || {
-      keepsakesCollected: {
-        book: false,
-        plushie: false,
-        sketchbook: false,
-        dreamList: false,
-        letter: false
-      },
-      chestUnlocked: false,
-      bedroomComplete: false
-    };
+    this.progress = getHouseProgress();
+    this.ensureBedroomState();
+    this.bedroomState = this.progress.bedroom;
     this.keepsakesCollected = this.bedroomState.keepsakesCollected;
-    this.rosePetalCount = progress.rosePetals || 0;
-    this.memoryCrestCount = progress.memoryCrests || 0;
-    this.stage = this.bedroomState.bedroomComplete ? "complete-view" : "intro";
+    this.rosePetalCount = this.progress.rosePetals || 0;
+    this.memoryCrestCount = this.progress.memoryCrests || 0;
     this.hoveredHotspot = null;
+    this.busy = false;
 
-    this.cameras.main.setBackgroundColor("#000000");
-    this.cameras.main.fadeIn(1500, 0, 0, 0);
+    logProgressEvent("SCENE START", { scene: "BedroomScene", progress: this.progress });
 
-    this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: false, creaks: true, musicBox: true });
+    this.cameras.main.setBackgroundColor("#030202");
+    this.cameras.main.fadeIn(1200, 0, 0, 0);
+
+    this.audio = new SceneAudio(this, {
+      rain: false,
+      piano: true,
+      wind: true,
+      thunder: false,
+      creaks: true,
+      musicBox: true
+    });
     this.audio.start();
     this.audio.fadeIn();
 
-    this.createBackground();
-    this.createEnvironmentLayer();
+    this.createRoom();
     this.createOverlays();
     this.createChest();
-    this.createKeepsakeHotspots();
+    this.createHotspots();
     this.createInventory();
     this.createVignette();
 
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
 
-    if (this.bedroomState.bedroomComplete) {
-      this.stage = "complete-view";
+    if (this.bedroomState.bedroomComplete || this.progress.bedroomComplete) {
       this.setupCompleteView();
     } else {
-      this.time.delayedCall(1200, () => this.playIntro());
+      this.time.delayedCall(800, () => this.playIntro());
     }
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      logProgressEvent("SCENE END", { scene: "BedroomScene", stage: this.stage, petals: this.rosePetalCount, crests: this.memoryCrestCount });
-      this.autosave();
-      if (this.audio) this.audio.destroy();
-      if (this.dialogue) this.dialogue.hide();
-      if (this.inventoryText) this.inventoryText.destroy();
-      if (this.chestGlow) this.chestGlow.clear();
-      if (this.hotspotGlow) this.hotspotGlow.clear();
-      if (this.warmOverlay) this.warmOverlay.destroy();
-      this.scale.off("resize", this.resizeWarmOverlay, this);
-    });
+    this.bindShutdown();
   }
 
   update(_, deltaMs) {
-    const delta = deltaMs / 1000;
-    if (this.dialogue) this.dialogue.update(delta);
-    this.updateChestGlow();
-    this.updateHotspotGlow();
+    if (this.dialogue) this.dialogue.update(deltaMs / 1000);
+    this.updateGlow();
   }
 
-  getKeepsakesCollected() {
-    return Object.values(this.keepsakesCollected).filter(Boolean).length;
-  }
-
-  playIntro() {
-    this.playDialogueSequence([
-      "...",
-      "This was hers.",
-      "A soft laugh is heard somewhere in the room.",
-      "The room feels untouched.",
-      "Not ruined.",
-      "Not abandoned.",
-      "Preserved."
-    ], () => {
-      this.stage = "explore";
-      this.enableHotspots();
+  bindShutdown() {
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      logProgressEvent("SCENE END", {
+        scene: "BedroomScene",
+        petals: this.rosePetalCount,
+        crests: this.memoryCrestCount,
+        stage: this.stage
+      });
+      this.autosave();
+      if (this.audio) this.audio.destroy();
+      this.scale.off("resize", this.resizeScene, this);
     });
   }
 
-  createBackground() {
-    const key = this.bedroomState.bedroomComplete ? "bedroom_restored" : "bedroom";
-    this.background = this.add.image(0, 0, key).setOrigin(0.5).setDepth(0);
+  createRoom() {
+    const key = this.bedroomState.bedroomComplete ? TEXTURE_KEYS.restored : TEXTURE_KEYS.background;
+    this.background = this.add.image(0, 0, key)
+      .setOrigin(0.5)
+      .setDepth(0)
+      .setAlpha(1)
+      .setVisible(true);
     this.coverImage(this.background);
+    this.scale.on("resize", this.resizeScene, this);
   }
 
-  createEnvironmentLayer() {
-    this.envLayer = this.add.container(0, 0).setDepth(6);
+  resizeScene() {
+    if (this.background) this.coverImage(this.background);
+    if (this.restoredBackground) this.coverImage(this.restoredBackground);
+    if (this.inventoryText) {
+      this.inventoryText.setPosition(this.scale.width - 26, 24);
+      this.inventoryText.setFontSize(Math.max(13, Math.floor(this.scale.width / 92)));
+    }
   }
 
   coverImage(image) {
@@ -127,29 +124,31 @@ export class BedroomScene extends Phaser.Scene {
     image.setScale(Math.max(width / image.width, height / image.height));
   }
 
-  createOverlays() {
-    this.chestGlow = this.add.graphics().setDepth(8);
-    this.hotspotGlow = this.add.graphics().setDepth(8);
-    this.warmOverlay = this.add.rectangle(0, 0, 1, 1, 0xffd8a8, 0).setOrigin(0).setDepth(4);
-    this.resizeWarmOverlay();
-    this.scale.on("resize", this.resizeWarmOverlay, this);
+  fitImage(image, maxWidthRatio, maxHeightRatio) {
+    const { width, height } = this.scale;
+    return Math.min((width * maxWidthRatio) / image.width, (height * maxHeightRatio) / image.height);
   }
 
-  resizeWarmOverlay() {
+  createOverlays() {
     const { width, height } = this.scale;
-    this.warmOverlay.setSize(width, height);
-    this.warmOverlay.setPosition(0, 0);
+    this.hotspotGlow = this.add.graphics().setDepth(8);
+    this.flash = this.add.rectangle(0, 0, width, height, 0xf3f1ff, 0)
+      .setOrigin(0)
+      .setDepth(58);
+    this.silverLight = this.add.rectangle(0, 0, width, height, 0xdde8ff, 0)
+      .setOrigin(0)
+      .setDepth(5);
   }
 
   createChest() {
     const { width, height } = this.scale;
-    const chestKey = this.bedroomState.chestUnlocked ? "chest_opened" : "chest";
-    this.chest = this.add.image(
-      width * CHEST_HOTSPOT.x,
-      height * CHEST_HOTSPOT.y,
-      chestKey
-    ).setOrigin(0.5).setDepth(10);
-    this.chest.setScale(this.imageScale(this.chest, 0.12, 0.14));
+    const chestKey = this.bedroomState.chestUnlocked ? TEXTURE_KEYS.chestOpened : TEXTURE_KEYS.chest;
+    this.chest = this.add.image(width * CHEST_HOTSPOT.x, height * CHEST_HOTSPOT.y, chestKey)
+      .setOrigin(0.5)
+      .setDepth(11)
+      .setAlpha(0.98)
+      .setVisible(true);
+    this.chest.setScale(this.fitImage(this.chest, 0.26, 0.22));
 
     this.chestHotspot = this.add.rectangle(
       width * CHEST_HOTSPOT.x,
@@ -158,12 +157,13 @@ export class BedroomScene extends Phaser.Scene {
       height * CHEST_HOTSPOT.h,
       0xffffff,
       0
-    ).setDepth(39);
+    ).setDepth(42);
   }
 
-  createKeepsakeHotspots() {
+  createHotspots() {
     const { width, height } = this.scale;
     this.keepsakeHotspots = {};
+
     Object.entries(KEEPSAKE_HOTSPOTS).forEach(([id, spot]) => {
       if (this.keepsakesCollected[spot.keepsake]) return;
 
@@ -174,249 +174,221 @@ export class BedroomScene extends Phaser.Scene {
         height * spot.h,
         0xffffff,
         0
-      ).setDepth(39);
+      ).setDepth(41);
 
-      hotspot.setInteractive({ useHandCursor: true })
-        .on("pointerover", () => {
-          this.hoveredHotspot = id;
-        })
-        .on("pointerout", () => {
-          if (this.hoveredHotspot === id) this.hoveredHotspot = null;
-        })
-        .on("pointerdown", () => this.collectKeepsake(spot.keepsake));
-
+      hotspot.on("pointerover", () => this.hoveredHotspot = id);
+      hotspot.on("pointerout", () => {
+        if (this.hoveredHotspot === id) this.hoveredHotspot = null;
+      });
+      hotspot.on("pointerdown", () => this.collectKeepsake(spot.keepsake));
       this.keepsakeHotspots[id] = hotspot;
     });
   }
 
   createInventory() {
-    const { width, height } = this.scale;
-    this.inventoryText = this.add.text(
-      width * 0.02,
-      height * 0.02,
-      "",
-      {
-        fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
-        fontSize: `${Math.max(12, Math.floor(width / 96))}px`,
-        color: "#d4a574",
-        backgroundColor: "#0a0808",
-        padding: { x: 8, y: 4 }
-      }
-    ).setOrigin(0).setDepth(50);
+    const { width } = this.scale;
+    this.inventoryText = this.add.text(width - 26, 24, "", {
+      fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(13, Math.floor(width / 92))}px`,
+      color: "#d8b28d",
+      backgroundColor: "#070506",
+      padding: { x: 14, y: 10 },
+      align: "right",
+      lineSpacing: 6
+    }).setOrigin(1, 0).setDepth(55).setAlpha(0.9);
     this.updateInventoryHUD();
   }
 
   createVignette() {
     const { width, height } = this.scale;
-    const g = this.add.graphics().setDepth(50);
-
-    g.fillStyle(0x000000, 0.28);
-    g.fillRect(0, 0, width, height);
-
-    g.fillStyle(0x000000, 0.58);
-    g.fillRect(0, 0, width, height * 0.1);
-    g.fillRect(0, height * 0.9, width, height * 0.1);
-    g.fillRect(0, 0, width * 0.06, height);
-    g.fillRect(width * 0.94, 0, width * 0.06, height);
-
-    g.fillStyle(0x1a0a12, 0.14);
-    g.fillRect(0, 0, width, height);
+    this.vignette = this.add.graphics().setDepth(50);
+    this.vignette.fillStyle(0x000000, 0.22);
+    this.vignette.fillRect(0, 0, width, height);
+    this.vignette.fillStyle(0x000000, 0.54);
+    this.vignette.fillRect(0, 0, width, height * 0.09);
+    this.vignette.fillRect(0, height * 0.91, width, height * 0.09);
+    this.vignette.fillRect(0, 0, width * 0.05, height);
+    this.vignette.fillRect(width * 0.95, 0, width * 0.05, height);
   }
 
-  imageScale(image, targetWidth, targetHeight) {
-    const { width, height } = this.scale;
-    const scaleX = (width * targetWidth) / image.width;
-    const scaleY = (height * targetHeight) / image.height;
-    return Math.min(scaleX, scaleY);
+  playIntro() {
+    this.stage = "intro";
+    this.playSoftLaugh();
+    this.playDialogueSequence([
+      "...",
+      "This was hers.",
+      "A soft laugh is heard somewhere in the room.",
+      "The room feels untouched.",
+      "Not ruined.",
+      "Not abandoned.",
+      "Preserved."
+    ], () => this.enableExploration());
   }
 
-  enableHotspots() {
-    this.chestHotspot.setInteractive({ useHandCursor: true })
-      .on("pointerover", () => {
-        this.hoveredHotspot = "chest";
-      })
+  playSoftLaugh() {
+    if (!window.__houseAudioContext) return;
+    const context = window.__houseAudioContext;
+    const osc = context.createOscillator();
+    const gain = context.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 740;
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(0.018, context.currentTime + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 1.4);
+    osc.connect(gain);
+    gain.connect(context.destination);
+    osc.start();
+    osc.stop(context.currentTime + 1.5);
+  }
+
+  enableExploration() {
+    if (this.bedroomState.crestCollected && !this.bedroomState.finalPetalCollected) {
+      this.showFinalPetal();
+      return;
+    }
+
+    this.stage = "explore";
+    this.enableChest();
+    Object.values(this.keepsakeHotspots).forEach((hotspot) => hotspot.setInteractive({ useHandCursor: true }));
+  }
+
+  enableChest() {
+    this.chestHotspot.removeAllListeners();
+    this.chestHotspot
+      .setInteractive({ useHandCursor: true })
+      .on("pointerover", () => this.hoveredHotspot = "chest")
       .on("pointerout", () => {
         if (this.hoveredHotspot === "chest") this.hoveredHotspot = null;
       })
       .on("pointerdown", () => this.interactChest());
-
-    Object.values(this.keepsakeHotspots).forEach(hotspot => {
-      hotspot.setInteractive({ useHandCursor: true });
-    });
   }
 
-  updateChestGlow() {
-    if (!this.chestGlow) return;
-    const { width, height } = this.scale;
-    const pulse = 0.5 + Math.sin(this.time.now * 0.0025) * 0.5;
-    const alpha = this.hoveredHotspot === "chest" ? 0.18 : 0.045 + pulse * 0.035;
-    this.chestGlow.clear();
-    this.chestGlow.fillStyle(0xffd56a, alpha);
-    this.chestGlow.fillEllipse(
-      width * CHEST_HOTSPOT.x,
-      height * CHEST_HOTSPOT.y,
-      width * CHEST_HOTSPOT.w * 1.1,
-      height * CHEST_HOTSPOT.h * 0.75
-    );
+  ensureBedroomState() {
+    const defaults = {
+      keepsakesCollected: {
+        book: false,
+        plushie: false,
+        sketchbook: false,
+        dreamList: false,
+        letter: false
+      },
+      plushiePetalCollected: false,
+      dreamListPetalCollected: false,
+      finalPetalCollected: false,
+      chestUnlocked: false,
+      crestCollected: false,
+      bedroomComplete: false
+    };
+    const current = this.progress.bedroom || {};
+    const currentKeepsakes = current.keepsakesCollected || current.keepsakes || {};
+    this.progress.bedroom = {
+      ...defaults,
+      ...current,
+      bedroomComplete: Boolean(current.bedroomComplete || this.progress.bedroomComplete),
+      keepsakesCollected: {
+        ...defaults.keepsakesCollected,
+        ...currentKeepsakes
+      }
+    };
   }
 
-  updateHotspotGlow() {
-    if (!this.hotspotGlow || !this.hoveredHotspot || this.hoveredHotspot === "chest") {
-      if (this.hotspotGlow) this.hotspotGlow.clear();
-      return;
-    }
-
-    const spot = KEEPSAKE_HOTSPOTS[this.hoveredHotspot];
-    if (!spot) return;
-
-    const { width, height } = this.scale;
-    const pulse = 0.5 + Math.sin(this.time.now * 0.003) * 0.5;
+  updateGlow() {
+    if (!this.hotspotGlow) return;
     this.hotspotGlow.clear();
-    this.hotspotGlow.fillStyle(0xffd56a, 0.14 + pulse * 0.14);
-    this.hotspotGlow.fillEllipse(
-      width * spot.x,
-      height * spot.y,
-      width * spot.w * 1.1,
-      height * spot.h * 0.75
-    );
-  }
+    if (this.busy || this.stage === "complete") return;
 
-  updateInventoryHUD() {
-    let text = `Keepsakes: ${this.getKeepsakesCollected()} / 5`;
-    text += `\nRose Petals: ${this.rosePetalCount} / 20`;
-    if (this.memoryCrestCount > 0) {
-      text += `\nMemory Crests: ${this.memoryCrestCount} / 6`;
+    const { width, height } = this.scale;
+    const pulse = 0.5 + Math.sin(this.time.now * 0.004) * 0.5;
+    const draw = (spot, color, alphaBoost = 0) => {
+      const hover = this.hoveredHotspot === spot.id;
+      this.hotspotGlow.fillStyle(color, (hover ? 0.24 : 0.09) + pulse * 0.11 + alphaBoost);
+      this.hotspotGlow.fillEllipse(width * spot.x, height * spot.y, width * spot.w, height * spot.h * 0.65);
+    };
+
+    if (this.stage === "explore") {
+      draw({ id: "chest", ...CHEST_HOTSPOT }, 0xffd56a, this.getKeepsakesCollected() === 5 ? 0.08 : 0);
+      Object.entries(KEEPSAKE_HOTSPOTS).forEach(([id, spot]) => {
+        if (!this.keepsakesCollected[spot.keepsake]) draw({ id, ...spot }, 0xaecbff);
+      });
     }
-    this.inventoryText.setText(text);
-    this.progress.rosePetals = this.rosePetalCount;
-    this.progress.memoryCrests = this.memoryCrestCount;
-  }
 
-  autosave() {
-    this.progress.bedroom = this.bedroomState;
-    saveProgress();
+    if (this.stage === "final-petal" && this.finalPetal) {
+      this.hotspotGlow.fillStyle(0xff3b32, 0.12 + pulse * 0.16);
+      this.hotspotGlow.fillEllipse(this.finalPetal.x, this.finalPetal.y, this.finalPetal.displayWidth * 1.3, this.finalPetal.displayHeight * 0.8);
+    }
   }
 
   interactChest() {
+    if (this.busy || this.stage !== "explore") return;
+
     if (this.bedroomState.chestUnlocked) {
+      this.disableExploration();
       this.playFinalChestDialogue();
       return;
     }
 
+    this.busy = true;
     const collected = this.getKeepsakesCollected();
     this.playDialogueSequence([
       "To know me,",
       "Find the things I loved.",
-      "",
       `${collected} / 5 Keepsakes Found`
-    ]);
+    ], () => {
+      this.busy = false;
+      this.stage = "explore";
+    });
   }
 
   collectKeepsake(keepsake) {
-    if (this.keepsakesCollected[keepsake]) return;
+    if (this.busy || this.stage !== "explore" || this.keepsakesCollected[keepsake]) return;
+    this.disableExploration();
 
-    switch (keepsake) {
-      case "book":
-        this.collectBook();
-        break;
-      case "plushie":
-        this.collectPlushie();
-        break;
-      case "sketchbook":
-        this.collectSketchbook();
-        break;
-      case "dreamList":
-        this.collectDreamList();
-        break;
-      case "letter":
-        this.collectLetter();
-        break;
-    }
+    if (keepsake === "book") this.collectBook();
+    if (keepsake === "plushie") this.collectPlushie();
+    if (keepsake === "sketchbook") this.collectSketchbook();
+    if (keepsake === "dreamList") this.collectDreamList();
+    if (keepsake === "letter") this.collectLetter();
   }
 
   collectBook() {
     this.playDialogueSequence([
       "I reread this far too many times.",
       "And I'll do it again."
-    ], () => {
-      this.keepsakesCollected.book = true;
-      this.markKeepsakeCollected("bed");
-      this.autosave();
-      this.updateInventoryHUD();
-      this.checkChestUnlock();
-    });
+    ], () => this.finishKeepsake("book", "bed"));
   }
 
   collectPlushie() {
-    const { width, height } = this.scale;
-    const plushie = this.add.image(width / 2, height * 0.4, "plushie").setOrigin(0.5).setDepth(60).setAlpha(0);
-    plushie.setScale(this.imageScale(plushie, 0.25, 0.3));
-    this.tweens.add({ targets: plushie, alpha: 1, duration: 800 });
-
+    const plushie = this.showItem(TEXTURE_KEYS.plushie, 0.32, 0.42);
     this.playDialogueSequence([
       "This little creature has witnessed",
       "an unreasonable amount of emotional support."
     ], () => {
-      this.keepsakesCollected.plushie = true;
-      this.rosePetalCount = Math.max(this.rosePetalCount, 7);
-      this.markKeepsakeCollected("chair");
-      this.autosave();
-      this.updateInventoryHUD();
-
-      this.time.delayedCall(1000, () => {
-        this.playDialogueSequence(["You were jealous of the plushie."], () => {
-          this.tweens.add({ targets: plushie, alpha: 0, duration: 600, onComplete: () => plushie.destroy() });
-          this.checkChestUnlock();
-        });
+      this.finishKeepsake("plushie", "chair");
+      this.awardRosePetal("plushiePetalCollected", 7, "Bedroom plushie");
+      this.playDialogueSequence(["You were jealous of the plushie."], () => {
+        this.hideItem(plushie);
+        this.afterKeepsake();
       });
     });
   }
 
   collectSketchbook() {
-    const { width, height } = this.scale;
-    const sketchbook = this.add.image(width / 2, height * 0.4, "sketchbook").setOrigin(0.5).setDepth(60).setAlpha(0);
-    sketchbook.setScale(this.imageScale(sketchbook, 0.25, 0.3));
-    this.tweens.add({ targets: sketchbook, alpha: 1, duration: 800 });
-
+    const sketchbook = this.showItem(TEXTURE_KEYS.sketchbook, 0.36, 0.44);
     this.playDialogueSequence([
       "Some pages are beautiful.",
       "Others are unfinished.",
       "Others are complete nonsense.",
       "Not every masterpiece needs to be finished."
     ], () => {
-      this.keepsakesCollected.sketchbook = true;
-      this.markKeepsakeCollected("desk");
-      this.autosave();
-      this.updateInventoryHUD();
-
+      this.finishKeepsake("sketchbook", "desk");
       this.lightCandle();
-      this.time.delayedCall(1000, () => {
-        this.tweens.add({ targets: sketchbook, alpha: 0, duration: 600, onComplete: () => sketchbook.destroy() });
-        this.checkChestUnlock();
-      });
-    });
-  }
-
-  lightCandle() {
-    const { width, height } = this.scale;
-    const candle = this.add.circle(width * 0.75, height * 0.5, 8, 0xffd56a, 0).setDepth(15);
-    this.tweens.add({ targets: candle, alpha: 0.8, duration: 500 });
-    this.tweens.add({
-      targets: candle,
-      scale: { from: 1, to: 1.3 },
-      alpha: { from: 0.8, to: 0.4 },
-      duration: 800,
-      yoyo: true,
-      repeat: -1
+      this.hideItem(sketchbook);
+      this.afterKeepsake();
     });
   }
 
   collectDreamList() {
-    const { width, height } = this.scale;
-    const dreamList = this.add.image(width / 2, height * 0.4, "dream_list").setOrigin(0.5).setDepth(60).setAlpha(0);
-    dreamList.setScale(this.imageScale(dreamList, 0.3, 0.35));
-    this.tweens.add({ targets: dreamList, alpha: 1, duration: 800 });
-
+    const dreamList = this.showItem(TEXTURE_KEYS.dreamList, 0.56, 0.62);
     this.playDialogueSequence([
       "Places to visit.",
       "Things to learn.",
@@ -424,30 +396,19 @@ export class BedroomScene extends Phaser.Scene {
       "Tiny goals.",
       "Big goals.",
       "Impossible goals.",
-      "",
       "Hopefully with him."
     ], () => {
-      this.keepsakesCollected.dreamList = true;
-      this.rosePetalCount = Math.max(this.rosePetalCount, 8);
-      this.markKeepsakeCollected("mirror");
-      this.autosave();
-      this.updateInventoryHUD();
-
-      this.time.delayedCall(1000, () => {
-        this.playDialogueSequence(["I always wanted you there."], () => {
-          this.tweens.add({ targets: dreamList, alpha: 0, duration: 600, onComplete: () => dreamList.destroy() });
-          this.checkChestUnlock();
-        });
+      this.finishKeepsake("dreamList", "mirror");
+      this.awardRosePetal("dreamListPetalCollected", 8, "Bedroom dream list");
+      this.playDialogueSequence(["I always wanted you there."], () => {
+        this.hideItem(dreamList);
+        this.afterKeepsake();
       });
     });
   }
 
   collectLetter() {
-    const { width, height } = this.scale;
-    const letter = this.add.image(width / 2, height * 0.4, "letter").setOrigin(0.5).setDepth(60).setAlpha(0);
-    letter.setScale(this.imageScale(letter, 0.25, 0.3));
-    this.tweens.add({ targets: letter, alpha: 1, duration: 800 });
-
+    const letter = this.showItem(TEXTURE_KEYS.letter, 0.46, 0.56);
     this.playDialogueSequence([
       "If you've made it this far...",
       "Then you've been looking very carefully.",
@@ -457,38 +418,63 @@ export class BedroomScene extends Phaser.Scene {
       "It's about being known.",
       "And you always made me feel seen."
     ], () => {
-      this.keepsakesCollected.letter = true;
-      this.markKeepsakeCollected("wardrobe");
-      this.autosave();
-      this.updateInventoryHUD();
-
-      this.time.delayedCall(1000, () => {
-        this.tweens.add({ targets: letter, alpha: 0, duration: 600, onComplete: () => letter.destroy() });
-        this.checkChestUnlock();
-      });
+      this.finishKeepsake("letter", "wardrobe");
+      this.hideItem(letter);
+      this.afterKeepsake();
     });
   }
 
-  markKeepsakeCollected(hotspotId) {
+  showItem(key, widthRatio, heightRatio) {
+    const { width, height } = this.scale;
+    const item = this.add.image(width / 2, height * 0.38, key)
+      .setOrigin(0.5)
+      .setDepth(61)
+      .setAlpha(0)
+      .setVisible(true);
+    item.setScale(this.fitImage(item, widthRatio, heightRatio));
+    this.tweens.add({ targets: item, alpha: 1, duration: 550 });
+    return item;
+  }
+
+  hideItem(item) {
+    if (!item) return;
+    this.tweens.add({
+      targets: item,
+      alpha: 0,
+      duration: 450,
+      onComplete: () => item.destroy()
+    });
+  }
+
+  finishKeepsake(keepsake, hotspotId) {
+    this.keepsakesCollected[keepsake] = true;
     if (this.keepsakeHotspots[hotspotId]) {
       this.keepsakeHotspots[hotspotId].destroy();
       delete this.keepsakeHotspots[hotspotId];
     }
+    this.autosave();
+    this.updateInventoryHUD();
+  }
+
+  afterKeepsake() {
+    this.time.delayedCall(350, () => {
+      if (this.checkChestUnlock()) return;
+      this.busy = false;
+      this.enableExploration();
+    });
   }
 
   checkChestUnlock() {
-    if (this.getKeepsakesCollected() === 5 && !this.bedroomState.chestUnlocked) {
-      this.bedroomState.chestUnlocked = true;
-      this.autosave();
-      this.unlockChest();
-    }
+    if (this.getKeepsakesCollected() !== 5 || this.bedroomState.chestUnlocked) return false;
+    this.bedroomState.chestUnlocked = true;
+    this.autosave();
+    this.unlockChest();
+    return true;
   }
 
   unlockChest() {
-    const { width, height } = this.scale;
-    this.chest.setTexture("chest_opened");
-    this.chest.setScale(this.imageScale(this.chest, 0.12, 0.14));
-
+    this.chest.setTexture(TEXTURE_KEYS.chestOpened);
+    this.chest.setScale(this.fitImage(this.chest, 0.32, 0.26));
     this.playDialogueSequence([
       "Inside rests no treasure.",
       "No artifact.",
@@ -498,30 +484,22 @@ export class BedroomScene extends Phaser.Scene {
       "Little objects.",
       "Small memories.",
       "A life."
-    ], () => {
-      this.playFinalChestDialogue();
-    });
+    ], () => this.playFinalChestDialogue());
   }
 
   playFinalChestDialogue() {
+    this.busy = true;
     this.playDialogueSequence([
       "People spend their whole lives hoping someone will understand them.",
       "Thank you for trying.",
       "Thank you for staying.",
-      "",
       "You found everything."
     ], () => {
-      this.showPlayerResponse();
-    });
-  }
-
-  showPlayerResponse() {
-    this.playDialogueSequence(["I think so."], () => {
-      this.time.delayedCall(1500, () => {
-        this.playDialogueSequence(["No."], () => {
-          this.time.delayedCall(1500, () => {
-            this.playDialogueSequence(["You found me."], () => {
-              this.completeBedroom();
+      this.playDialogueSequence(["I think so."], () => {
+        this.time.delayedCall(900, () => {
+          this.playDialogueSequence(["No."], () => {
+            this.time.delayedCall(900, () => {
+              this.playDialogueSequence(["You found me."], () => this.completeBedroom());
             });
           });
         });
@@ -530,89 +508,198 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   completeBedroom() {
-    this.bedroomState.bedroomComplete = true;
-    this.autosave();
+    if (this.bedroomState.crestCollected) {
+      this.showFinalPetal();
+      return;
+    }
 
-    this.cameras.main.fadeOut(1500, 0, 0, 0);
-    this.time.delayedCall(1600, () => {
-      this.background.setTexture("bedroom_restored");
-      this.coverImage(this.background);
-      this.cameras.main.fadeIn(2000, 0, 0, 0);
+    this.stage = "restoring";
+    this.restoredBackground = this.add.image(0, 0, TEXTURE_KEYS.restored)
+      .setOrigin(0.5)
+      .setDepth(1)
+      .setAlpha(0)
+      .setVisible(true);
+    this.coverImage(this.restoredBackground);
 
-      this.time.delayedCall(2200, () => {
-        this.warmOverlay.setAlpha(0.15);
-        this.revealCrest();
-      });
-    });
+    this.tweens.add({ targets: this.restoredBackground, alpha: 1, duration: 1600 });
+    this.tweens.add({ targets: this.silverLight, alpha: 0.24, duration: 1200, yoyo: true, hold: 700 });
+
+    this.time.delayedCall(1800, () => this.revealCrest());
   }
 
   revealCrest() {
     const { width, height } = this.scale;
-    const crest = this.add.image(width / 2, height * 0.4, "crest_of_understanding").setOrigin(0.5);
-    crest.setScale(this.imageScale(crest, 0.28, 0.34)).setAlpha(0);
-    crest.setDepth(60);
-    this.tweens.add({ targets: crest, alpha: 1, duration: 900 });
+    const crest = this.add.image(width / 2, height * 0.4, TEXTURE_KEYS.crest)
+      .setOrigin(0.5)
+      .setDepth(62)
+      .setAlpha(0)
+      .setVisible(true);
+    crest.setScale(this.fitImage(crest, 0.34, 0.38));
 
-    this.time.delayedCall(1200, () => {
+    this.tweens.add({ targets: crest, alpha: 1, duration: 900 });
+    this.time.delayedCall(1000, () => {
       this.showQuestBanner("MEMORY CREST ACQUIRED\n\nTHE CREST OF UNDERSTANDING", () => {
-        this.memoryCrestCount = (this.memoryCrestCount || 0) + 1;
-        this.rosePetalCount = Math.max(this.rosePetalCount, 9);
+        this.bedroomState.crestCollected = true;
+        this.memoryCrestCount += 1;
+        this.progress.memoryCrests = this.memoryCrestCount;
+        this.progress.chapterFiveUnlocked = true;
         logProgressEvent("CREST COLLECTED", { scene: "BedroomScene", crest: "Crest of Understanding" });
         logProgressEvent("CREST TOTAL", { total: this.memoryCrestCount });
-        this.progress.bedroomComplete = true;
-        this.progress.chapterFiveUnlocked = true;
-        logProgressEvent("BEDROOM COMPLETE", { petals: this.rosePetalCount, crests: this.memoryCrestCount });
         logProgressEvent("CHAPTER UNLOCKED", { chapter: 5 });
-        this.progress.memoryCrests = this.memoryCrestCount;
-        this.progress.rosePetals = this.rosePetalCount;
         this.autosave();
         this.updateInventoryHUD();
-
-        this.time.delayedCall(1000, () => {
-          this.tweens.add({ targets: crest, alpha: 0, duration: 600, onComplete: () => crest.destroy() });
-          this.showFinalPetal();
+        this.tweens.add({
+          targets: crest,
+          alpha: 0,
+          duration: 600,
+          onComplete: () => {
+            crest.destroy();
+            this.showFinalPetal();
+          }
         });
       });
     });
   }
 
   showFinalPetal() {
-    const { width, height } = this.scale;
-    const petal = this.add.image(width * 0.5, height * 0.45, "rosePetal").setOrigin(0.5).setDepth(60).setAlpha(0);
-    petal.setScale(0.3);
-    this.tweens.add({ targets: petal, alpha: 1, duration: 800 });
+    if (this.bedroomState.finalPetalCollected) {
+      this.returnToGrandHall();
+      return;
+    }
 
+    const { width, height } = this.scale;
+    this.stage = "final-petal";
+    this.busy = false;
+    this.finalPetal = this.add.image(width * FINAL_PETAL_SPOT.x, height * FINAL_PETAL_SPOT.y, TEXTURE_KEYS.rosePetal)
+      .setOrigin(0.5)
+      .setDepth(60)
+      .setAlpha(0)
+      .setVisible(true);
+    this.finalPetal.setScale(this.fitImage(this.finalPetal, 0.08, 0.08));
+    this.tweens.add({ targets: this.finalPetal, alpha: 1, duration: 700 });
+    this.tweens.add({ targets: this.finalPetal, scaleX: this.finalPetal.scaleX * 1.08, scaleY: this.finalPetal.scaleY * 1.08, duration: 950, yoyo: true, repeat: -1 });
+
+    this.finalPetal.setInteractive({ useHandCursor: true })
+      .once("pointerdown", () => this.collectFinalPetal());
+  }
+
+  collectFinalPetal() {
+    if (this.stage !== "final-petal" || this.bedroomState.finalPetalCollected) return;
+    this.stage = "final-petal-collected";
+    this.finalPetal.disableInteractive();
+    this.awardRosePetal("finalPetalCollected", 9, "Bedroom final petal");
     this.playDialogueSequence([
       "You really were jealous of the plushie.",
       "Don't deny it."
     ], () => {
-      this.time.delayedCall(1500, () => {
-        this.tweens.add({ targets: petal, alpha: 0, duration: 600, onComplete: () => petal.destroy() });
-        this.returnToGrandHall();
+      this.tweens.add({
+        targets: this.finalPetal,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          this.finalPetal.destroy();
+          this.returnToGrandHall();
+        }
       });
+    });
+  }
+
+  awardRosePetal(flag, targetCount, source) {
+    if (this.bedroomState[flag]) return;
+    this.bedroomState[flag] = true;
+    this.rosePetalCount = Math.max(this.rosePetalCount + 1, targetCount);
+    this.progress.rosePetals = this.rosePetalCount;
+    logProgressEvent("ROSE PETAL COLLECTED", { scene: "BedroomScene", source });
+    logProgressEvent("ROSE PETAL TOTAL", { total: this.rosePetalCount });
+    this.autosave();
+    this.updateInventoryHUD();
+  }
+
+  lightCandle() {
+    const { width, height } = this.scale;
+    const glow = this.add.circle(width * 0.73, height * 0.43, 22, 0xffd56a, 0.3).setDepth(9);
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.18, to: 0.48 },
+      scale: { from: 0.75, to: 1.2 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  disableExploration() {
+    this.busy = true;
+    if (this.chestHotspot) this.chestHotspot.disableInteractive();
+    Object.values(this.keepsakeHotspots).forEach((hotspot) => hotspot.disableInteractive());
+  }
+
+  setupCompleteView() {
+    this.stage = "complete";
+    this.chest.setTexture(TEXTURE_KEYS.chestOpened);
+    this.background.setTexture(TEXTURE_KEYS.restored);
+    this.coverImage(this.background);
+    this.silverLight.setAlpha(0.12);
+    this.updateInventoryHUD();
+    this.time.delayedCall(700, () => this.playDialogueSequence(["The bedroom rests in peace."], () => this.returnToGrandHall()));
+  }
+
+  getKeepsakesCollected() {
+    return Object.values(this.keepsakesCollected).filter(Boolean).length;
+  }
+
+  updateInventoryHUD() {
+    this.progress.rosePetals = this.rosePetalCount;
+    this.progress.memoryCrests = this.memoryCrestCount;
+    if (!this.inventoryText) return;
+
+    let text = `Keepsakes: ${this.getKeepsakesCollected()} / 5`;
+    text += `\nRose Petals: ${this.rosePetalCount} / 20`;
+    text += `\nMemory Crests: ${this.memoryCrestCount} / 6`;
+    this.inventoryText.setText(text);
+  }
+
+  autosave() {
+    this.progress.bedroom = this.bedroomState;
+    this.progress.rosePetals = this.rosePetalCount;
+    this.progress.memoryCrests = this.memoryCrestCount;
+    saveProgress();
+  }
+
+  returnToGrandHall() {
+    this.bedroomState.bedroomComplete = true;
+    this.progress.bedroomComplete = true;
+    this.progress.chapterFiveUnlocked = true;
+    this.autosave();
+    logProgressEvent("BEDROOM COMPLETE", { petals: this.rosePetalCount, crests: this.memoryCrestCount });
+
+    this.playDialogueSequence(["The house remembers."], () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.time.delayedCall(1050, () => this.scene.start("GrandHallScene", { fromBedroom: true }));
     });
   }
 
   showQuestBanner(text, onComplete) {
     const { width, height } = this.scale;
-    const banner = this.add.container(0, 0).setDepth(70).setAlpha(0);
-    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.72).setOrigin(0);
+    const banner = this.add.container(0, 0).setDepth(72).setAlpha(0);
+    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.76).setOrigin(0);
     const bannerText = this.add.text(width / 2, height / 2, text, {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(18, Math.floor(width / 48))}px`,
       color: "#f4d7b7",
       align: "center",
+      lineSpacing: 10,
       backgroundColor: "#0a0808",
-      padding: { x: 16, y: 12 }
+      padding: { x: 18, y: 14 }
     }).setOrigin(0.5);
     banner.add([shade, bannerText]);
-    this.tweens.add({ targets: banner, alpha: 1, duration: 600 });
+    this.tweens.add({ targets: banner, alpha: 1, duration: 500 });
 
     this.input.once("pointerdown", () => {
       this.tweens.add({
         targets: banner,
         alpha: 0,
-        duration: 500,
+        duration: 450,
         onComplete: () => {
           banner.destroy();
           if (onComplete) onComplete();
@@ -621,40 +708,17 @@ export class BedroomScene extends Phaser.Scene {
     });
   }
 
-  setupCompleteView() {
-    this.warmOverlay.setAlpha(0.15);
-    this.enableHotspots();
-  }
-
-  returnToGrandHall() {
-    this.autosave();
-    this.playDialogueSequence(["The house remembers."], () => {
-      this.cameras.main.fadeOut(1400, 0, 0, 0);
-      this.time.delayedCall(1500, () => {
-        this.scene.start("GrandHallScene", { fromBedroom: true });
-      });
-    }, [800]);
-  }
-
-  playDialogueSequence(lines, onComplete = null, extraDelays = []) {
-    const queue = [...lines];
-    let delayIndex = 0;
-
+  playDialogueSequence(lines, onComplete = null) {
+    const queue = lines.filter((line) => line !== "");
     const playNext = () => {
       if (queue.length === 0) {
         if (onComplete) onComplete();
         return;
       }
-
-      const line = queue.shift();
-      const extraDelay = extraDelays[delayIndex] || 0;
-      delayIndex++;
-
-      this.dialogue.show(line, () => {
-        this.time.delayedCall(500 + extraDelay, playNext);
+      this.dialogue.show(queue.shift(), () => {
+        this.time.delayedCall(420, playNext);
       });
     };
-
     playNext();
   }
 }
