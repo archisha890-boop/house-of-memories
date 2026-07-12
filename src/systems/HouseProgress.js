@@ -11,8 +11,12 @@ export function defaultProgress() {
     libraryComplete: false,
     galleryComplete: false,
     bedroomComplete: false,
+    kitchenComplete: false,
+    basementComplete: false,
     chapterFourUnlocked: false,
     chapterFiveUnlocked: false,
+    chapterSixUnlocked: false,
+    chapterSevenUnlocked: false,
     gallery: {
       frames: [false, false, false, false, false, false],
       fragments: [false, false, false, false],
@@ -41,6 +45,35 @@ export function defaultProgress() {
       chestUnlocked: false,
       crestCollected: false,
       bedroomComplete: false
+    },
+    kitchen: {
+      ingredients: {
+        spices: false,
+        recipe: false,
+        meat: false,
+        coriander: false
+      },
+      spicePuzzleComplete: false,
+      recipeFound: false,
+      pantryUnlocked: false,
+      pantryPuzzleComplete: false,
+      secretIngredientFound: false,
+      cookingComplete: false,
+      crestCollected: false,
+      kitchenComplete: false,
+      petalTenCollected: false,
+      petalElevenCollected: false,
+      petalTwelveCollected: false
+    },
+    basement: {
+      entered: false,
+      fragments: [false, false, false, false, false],
+      mirrorRestored: false,
+      basementComplete: false,
+      crestCollected: false,
+      petalThirteenCollected: false,
+      petalFourteenCollected: false,
+      petalFifteenCollected: false
     }
   };
 }
@@ -49,6 +82,8 @@ function normalizeProgress(saved = {}) {
   const defaults = defaultProgress();
   const savedBedroom = saved.bedroom || {};
   const savedKeepsakes = savedBedroom.keepsakesCollected || savedBedroom.keepsakes || {};
+  const savedKitchen = saved.kitchen || {};
+  const savedBasement = saved.basement || {};
   return {
     ...defaults,
     ...saved,
@@ -63,6 +98,21 @@ function normalizeProgress(saved = {}) {
         ...defaults.bedroom.keepsakesCollected,
         ...savedKeepsakes
       }
+    },
+    kitchen: {
+      ...defaults.kitchen,
+      ...savedKitchen,
+      kitchenComplete: Boolean(savedKitchen.kitchenComplete || saved.kitchenComplete),
+      ingredients: {
+        ...defaults.kitchen.ingredients,
+        ...(savedKitchen.ingredients || {})
+      }
+    },
+    basement: {
+      ...defaults.basement,
+      ...savedBasement,
+      basementComplete: Boolean(savedBasement.basementComplete || saved.basementComplete),
+      fragments: [...defaults.basement.fragments].map((value, index) => Boolean((savedBasement.fragments || [])[index] ?? value))
     }
   };
 }

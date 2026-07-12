@@ -11,13 +11,15 @@ export class GrandHallScene extends Phaser.Scene {
     this.hubUnlocked = false;
     this.libraryComplete = false;
     this.galleryComplete = false;
+    this.kitchenComplete = false;
+    this.basementComplete = false;
     this.chapterFourUnlocked = false;
   }
 
   create(data = {}) {
     const progress = getHouseProgress();
     logProgressEvent("SCENE START", { scene: "GrandHallScene", data, progress });
-    if (data.fromLibrary || data.fromGallery || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
+    if (data.fromLibrary || data.fromGallery || data.fromBedroom || data.fromKitchen || data.fromBasement || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
       this.createReturnedHub(progress, data);
       return;
     }
@@ -28,6 +30,8 @@ export class GrandHallScene extends Phaser.Scene {
     this.hubUnlocked = false;
     this.libraryComplete = false;
     this.galleryComplete = false;
+    this.kitchenComplete = false;
+    this.basementComplete = false;
     this.chapterFourUnlocked = false;
 
     this.cameras.main.setBackgroundColor("#030202");
@@ -65,6 +69,8 @@ export class GrandHallScene extends Phaser.Scene {
     this.memoryCrestCount = progress.memoryCrests || 0;
     this.libraryComplete = progress.libraryComplete || data.fromLibrary;
     this.galleryComplete = progress.galleryComplete || data.fromGallery;
+    this.kitchenComplete = progress.kitchenComplete || data.fromKitchen;
+    this.basementComplete = progress.basementComplete || data.fromBasement;
     this.chapterFourUnlocked = progress.chapterFourUnlocked || false;
     this.stage = "hub";
     this.hubUnlocked = true;
@@ -96,6 +102,16 @@ export class GrandHallScene extends Phaser.Scene {
     if (data.fromGallery && this.chapterFourUnlocked) {
       this.time.delayedCall(1200, () => {
         this.playDialogueSequence(["Chapter Four awaits.", "The manor continues to heal."]);
+      });
+    }
+
+    if (data.fromKitchen) {
+      this.time.delayedCall(1200, () => this.showKitchenReturnGift());
+    }
+
+    if (data.fromBasement) {
+      this.time.delayedCall(1200, () => {
+        this.playDialogueSequence(["The Grand Hall grows steadier.", "Another memory has endured."]);
       });
     }
 
@@ -150,6 +166,8 @@ export class GrandHallScene extends Phaser.Scene {
     this.updateGateGlow();
     this.updateLibraryGlow();
     this.updateGalleryGlow();
+    this.updateKitchenGlow();
+    this.updateBasementGlow();
   }
 
   createHall() {
@@ -172,6 +190,11 @@ export class GrandHallScene extends Phaser.Scene {
     this.gateGlow = this.add.graphics().setDepth(8);
     this.libraryGlow = this.add.graphics().setDepth(8);
     this.galleryGlow = this.add.graphics().setDepth(8);
+    this.kitchenGlow = this.add.graphics().setDepth(8);
+    this.basementGlow = this.add.graphics().setDepth(8);
+    this.hallWarmth = this.add.rectangle(0, 0, width, height, 0xffbd73, 0)
+      .setOrigin(0)
+      .setDepth(5);
   }
 
   createInventory() {
@@ -614,6 +637,8 @@ export class GrandHallScene extends Phaser.Scene {
     const progress = getHouseProgress();
     Object.entries(this.roomHotspots).forEach(([name, hotspot]) => {
       if (name === "bedroom" && !progress.galleryComplete) return;
+      if (name === "kitchen" && !progress.bedroomComplete) return;
+      if (name === "basement" && !progress.kitchenComplete) return;
 
       hotspot.setInteractive({ useHandCursor: true })
         .on("pointerover", () => {
@@ -675,6 +700,46 @@ export class GrandHallScene extends Phaser.Scene {
     this.galleryGlow.fillEllipse(width * 0.83, height * 0.27, width * 0.18, height * 0.12);
   }
 
+  updateKitchenGlow() {
+    if (!this.hubUnlocked || !this.kitchenGlow) {
+      if (this.kitchenGlow) this.kitchenGlow.clear();
+      return;
+    }
+    const progress = getHouseProgress();
+    if (!progress.bedroomComplete) {
+      this.kitchenGlow.clear();
+      return;
+    }
+    const { width, height } = this.scale;
+    const pulse = 0.5 + Math.sin(this.time.now * 0.0045) * 0.5;
+    const gold = progress.kitchenComplete;
+    const baseColor = gold ? 0xffd56a : 0xffb15a;
+    const hoverBoost = this.hoveredRoom === "kitchen" ? 0.24 : (gold ? 0.18 : 0.13);
+    this.kitchenGlow.clear();
+    this.kitchenGlow.fillStyle(baseColor, hoverBoost + pulse * 0.15);
+    this.kitchenGlow.fillEllipse(width * 0.09, height * 0.64, width * 0.15, height * 0.11);
+  }
+
+  updateBasementGlow() {
+    if (!this.hubUnlocked || !this.basementGlow) {
+      if (this.basementGlow) this.basementGlow.clear();
+      return;
+    }
+    const progress = getHouseProgress();
+    if (!progress.kitchenComplete) {
+      this.basementGlow.clear();
+      return;
+    }
+    const { width, height } = this.scale;
+    const pulse = 0.5 + Math.sin(this.time.now * 0.0042) * 0.5;
+    const gold = progress.basementComplete;
+    const baseColor = gold ? 0xffd56a : 0xcbdcff;
+    const hoverBoost = this.hoveredRoom === "basement" ? 0.24 : (gold ? 0.18 : 0.13);
+    this.basementGlow.clear();
+    this.basementGlow.fillStyle(baseColor, hoverBoost + pulse * 0.14);
+    this.basementGlow.fillEllipse(width * 0.23, height * 0.64, width * 0.14, height * 0.11);
+  }
+
   enterRoom(name) {
     if (!this.hubUnlocked) return;
     const progress = getHouseProgress();
@@ -717,7 +782,88 @@ export class GrandHallScene extends Phaser.Scene {
       return;
     }
 
+    if (name === "kitchen") {
+      if (!progress.bedroomComplete) {
+        this.playDialogueSequence(["The kitchen can wait.", "The bedroom comes first."]);
+        return;
+      }
+      if (progress.kitchenComplete) {
+        this.playDialogueSequence(["The kitchen glows with warmth now.", "The fire remembers."]);
+        return;
+      }
+      this.cameras.main.fadeOut(900, 0, 0, 0);
+      this.time.delayedCall(950, () => this.scene.start("KitchenScene"));
+      return;
+    }
+
+    if (name === "basement") {
+      if (!progress.kitchenComplete) {
+        this.playDialogueSequence(["The basement can wait.", "The kitchen comes first."]);
+        return;
+      }
+      if (progress.basementComplete) {
+        this.playDialogueSequence(["The basement is quiet now.", "The mirror holds together."]);
+        return;
+      }
+      this.cameras.main.fadeOut(900, 0, 0, 0);
+      this.time.delayedCall(950, () => this.scene.start("BasementScene"));
+      return;
+    }
+
     this.playDialogueSequence(["This room can wait."]);
+  }
+
+  showKitchenReturnGift() {
+    const progress = getHouseProgress();
+    if (!progress.kitchen || progress.kitchen.petalTwelveCollected) {
+      this.playDialogueSequence(["Warmth fills the hall.", "The fireplace burns brighter."]);
+      return;
+    }
+
+    const { width, height } = this.scale;
+    if (this.hallWarmth) {
+      this.tweens.add({ targets: this.hallWarmth, alpha: 0.18, duration: 900, yoyo: true, hold: 900 });
+    }
+
+    const plate = this.add.container(0, 0).setDepth(65).setAlpha(0);
+    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.5).setOrigin(0);
+    const roll = this.add.image(width * 0.5, height * 0.46, "cookedRoll").setOrigin(0.5);
+    roll.setScale(Math.min((width * 0.38) / roll.width, (height * 0.28) / roll.height));
+    const petal = this.add.image(width * 0.62, height * 0.5, "rosePetal").setOrigin(0.5);
+    petal.setScale(Math.min((width * 0.08) / petal.width, (height * 0.08) / petal.height));
+    const prompt = this.add.text(width / 2, height * 0.73, "A keema roll waits beside a rose petal.", {
+      fontFamily: "IM Fell English SC, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(18, Math.floor(width / 58))}px`,
+      color: "#f1d9bb",
+      backgroundColor: "#080504",
+      padding: { x: 14, y: 8 }
+    }).setOrigin(0.5);
+    plate.add([shade, roll, petal, prompt]);
+    this.tweens.add({ targets: plate, alpha: 1, duration: 700 });
+    this.tweens.add({ targets: petal, scaleX: petal.scaleX * 1.1, scaleY: petal.scaleY * 1.1, duration: 900, yoyo: true, repeat: -1 });
+
+    petal.setInteractive({ useHandCursor: true }).once("pointerdown", () => {
+      progress.kitchen.petalTwelveCollected = true;
+      this.petalCount = Math.max((progress.rosePetals || 0) + 1, 12);
+      progress.rosePetals = this.petalCount;
+      logProgressEvent("ROSE PETAL COLLECTED", { scene: "GrandHallScene", source: "Kitchen return gift" });
+      logProgressEvent("ROSE PETAL TOTAL", { total: this.petalCount });
+      saveProgress();
+      this.updateInventoryHUD();
+
+      this.tweens.add({
+        targets: plate,
+        alpha: 0,
+        duration: 550,
+        onComplete: () => {
+          plate.destroy();
+          this.playDialogueSequence([
+            "You actually remembered the coriander.",
+            "I'm proud of you."
+          ]);
+        }
+      });
+    });
   }
 
   playDialogueSequence(lines, onComplete = null) {
