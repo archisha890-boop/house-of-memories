@@ -311,6 +311,9 @@ export class MainMenuScene extends Phaser.Scene {
     if (AudioContext && !window.__houseAudioContext) {
       window.__houseAudioContext = new AudioContext();
     }
+    if (!window.__houseAudioContext && this.sound?.context) {
+      window.__houseAudioContext = this.sound.context;
+    }
     if (window.__houseAudioContext?.resume) {
       void window.__houseAudioContext.resume();
     }

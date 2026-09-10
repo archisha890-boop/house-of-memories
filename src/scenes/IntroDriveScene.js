@@ -149,16 +149,21 @@ height * 0.17,
 .setInteractive({ useHandCursor: true })
 .on("pointerdown", () => this.openLetter());
 
+const compactLayout = width < 600;
 this.hint = this.add.text(
-width * 0.03,
-height * 0.92,
-"[L] Read Letter    [M] Check Mirror    [W] Look Outside",
+width * 0.5,
+height * 0.965,
+compactLayout
+  ? "[L] Letter     [M] Mirror\n[W] Look Outside"
+  : "[L] Read Letter    [M] Check Mirror    [W] Look Outside",
 {
 fontFamily: "IM Fell English SC, Georgia, Times New Roman, serif",
-fontSize: `${Math.max(16, Math.floor(width / 80))}px`,
-color: "#e0c7a0"
+fontSize: `${Math.max(compactLayout ? 12 : 16, Math.floor(width / (compactLayout ? 28 : 80)))}px`,
+color: "#e0c7a0",
+align: "center",
+lineSpacing: compactLayout ? 3 : 0
 }
-).setDepth(60);
+).setOrigin(0.5, 1).setDepth(60);
 
 this.tweens.add({
 targets: this.hint,

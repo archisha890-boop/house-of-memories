@@ -13,7 +13,6 @@ export class DialogueBox {
 
   create() {
     const { width, height } = this.scene.scale;
-    this.group = this.scene.add.group();
     this.panel = this.scene.add.graphics().setDepth(80);
     this.text = this.scene.add.text(width * 0.08, height * 0.7, "", {
       fontFamily: "IM Fell English SC, Georgia, Times New Roman, serif",
@@ -34,7 +33,6 @@ export class DialogueBox {
       color: "#a78164"
     }).setDepth(81).setOrigin(1, 1).setAlpha(0);
 
-    this.group.addMultiple([this.text, this.prompt, this.skipButton]);
     this.hide();
 
     this.onPointerDown = () => this.advance();
@@ -127,8 +125,12 @@ export class DialogueBox {
     this.scene.input.keyboard.off("keydown-SPACE", this.onSpace);
     this.scene.input.keyboard.off("keydown-ENTER", this.onEnter);
     this.scene.input.keyboard.off("keydown-ESC", this.onEscape);
-    this.group?.clear(true, true);
-    this.group?.destroy();
-    this.panel?.destroy();
+    [this.text, this.prompt, this.skipButton, this.panel].forEach((object) => {
+      if (object?.active) object.destroy();
+    });
+    this.text = null;
+    this.prompt = null;
+    this.skipButton = null;
+    this.panel = null;
   }
 }
