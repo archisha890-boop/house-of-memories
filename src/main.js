@@ -8,6 +8,7 @@ import { GalleryScene } from "./scenes/GalleryScene.js";
 import { BedroomScene } from "./scenes/BedroomScene.js";
 import { KitchenScene } from "./scenes/KitchenScene.js";
 import { BasementScene } from "./scenes/BasementScene.js";
+import { ObservatoryScene } from "./scenes/ObservatoryScene.js";
 import { PlaceholderScene } from "./scenes/PlaceholderScene.js";
 
 const config = {
@@ -25,7 +26,7 @@ const config = {
     pixelArt: true,
     roundPixels: true
   },
-  scene: [BootScene, MainMenuScene, IntroDriveScene, GraveyardScene, GrandHallScene, LibraryScene, GalleryScene, BedroomScene, KitchenScene, BasementScene, PlaceholderScene]
+  scene: [BootScene, MainMenuScene, IntroDriveScene, GraveyardScene, GrandHallScene, LibraryScene, GalleryScene, BedroomScene, KitchenScene, BasementScene, ObservatoryScene, PlaceholderScene]
 };
 
 new Phaser.Game(config);

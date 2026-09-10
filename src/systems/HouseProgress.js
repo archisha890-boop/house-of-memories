@@ -13,6 +13,9 @@ export function defaultProgress() {
     bedroomComplete: false,
     kitchenComplete: false,
     basementComplete: false,
+    observatoryComplete: false,
+    finaleUnlocked: false,
+    crimsonRoseAcquired: false,
     chapterFourUnlocked: false,
     chapterFiveUnlocked: false,
     chapterSixUnlocked: false,
@@ -74,6 +77,22 @@ export function defaultProgress() {
       petalThirteenCollected: false,
       petalFourteenCollected: false,
       petalFifteenCollected: false
+    },
+    observatory: {
+      entered: false,
+      constellations: [false, false, false, false, false],
+      staircaseClimbed: false,
+      telescopeSolved: false,
+      orrerySolved: false,
+      starChartSolved: false,
+      crimsonRoseAssembled: false,
+      crestCollected: false,
+      observatoryComplete: false,
+      petalSixteenCollected: false,
+      petalSeventeenCollected: false,
+      petalEighteenCollected: false,
+      petalNineteenCollected: false,
+      petalTwentyCollected: false
     }
   };
 }
@@ -84,6 +103,7 @@ function normalizeProgress(saved = {}) {
   const savedKeepsakes = savedBedroom.keepsakesCollected || savedBedroom.keepsakes || {};
   const savedKitchen = saved.kitchen || {};
   const savedBasement = saved.basement || {};
+  const savedObservatory = saved.observatory || {};
   return {
     ...defaults,
     ...saved,
@@ -113,6 +133,13 @@ function normalizeProgress(saved = {}) {
       ...savedBasement,
       basementComplete: Boolean(savedBasement.basementComplete || saved.basementComplete),
       fragments: [...defaults.basement.fragments].map((value, index) => Boolean((savedBasement.fragments || [])[index] ?? value))
+    },
+    observatory: {
+      ...defaults.observatory,
+      ...savedObservatory,
+      observatoryComplete: Boolean(savedObservatory.observatoryComplete || saved.observatoryComplete),
+      crimsonRoseAssembled: Boolean(savedObservatory.crimsonRoseAssembled || saved.crimsonRoseAcquired),
+      constellations: [...defaults.observatory.constellations].map((value, index) => Boolean((savedObservatory.constellations || [])[index] ?? value))
     }
   };
 }

@@ -13,13 +13,14 @@ export class GrandHallScene extends Phaser.Scene {
     this.galleryComplete = false;
     this.kitchenComplete = false;
     this.basementComplete = false;
+    this.observatoryComplete = false;
     this.chapterFourUnlocked = false;
   }
 
   create(data = {}) {
     const progress = getHouseProgress();
     logProgressEvent("SCENE START", { scene: "GrandHallScene", data, progress });
-    if (data.fromLibrary || data.fromGallery || data.fromBedroom || data.fromKitchen || data.fromBasement || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
+    if (data.fromLibrary || data.fromGallery || data.fromBedroom || data.fromKitchen || data.fromBasement || data.fromObservatory || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
       this.createReturnedHub(progress, data);
       return;
     }
@@ -32,6 +33,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.galleryComplete = false;
     this.kitchenComplete = false;
     this.basementComplete = false;
+    this.observatoryComplete = false;
     this.chapterFourUnlocked = false;
 
     this.cameras.main.setBackgroundColor("#030202");
@@ -71,6 +73,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.galleryComplete = progress.galleryComplete || data.fromGallery;
     this.kitchenComplete = progress.kitchenComplete || data.fromKitchen;
     this.basementComplete = progress.basementComplete || data.fromBasement;
+    this.observatoryComplete = progress.observatoryComplete || data.fromObservatory;
     this.chapterFourUnlocked = progress.chapterFourUnlocked || false;
     this.stage = "hub";
     this.hubUnlocked = true;
@@ -112,6 +115,12 @@ export class GrandHallScene extends Phaser.Scene {
     if (data.fromBasement) {
       this.time.delayedCall(1200, () => {
         this.playDialogueSequence(["The Grand Hall grows steadier.", "Another memory has endured."]);
+      });
+    }
+
+    if (data.fromObservatory) {
+      this.time.delayedCall(1200, () => {
+        this.playDialogueSequence(["The manor is whole.", "The Finale awaits."]);
       });
     }
 
@@ -168,6 +177,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.updateGalleryGlow();
     this.updateKitchenGlow();
     this.updateBasementGlow();
+    this.updateObservatoryGlow();
   }
 
   createHall() {
@@ -192,6 +202,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.galleryGlow = this.add.graphics().setDepth(8);
     this.kitchenGlow = this.add.graphics().setDepth(8);
     this.basementGlow = this.add.graphics().setDepth(8);
+    this.observatoryGlow = this.add.graphics().setDepth(8);
     this.hallWarmth = this.add.rectangle(0, 0, width, height, 0xffbd73, 0)
       .setOrigin(0)
       .setDepth(5);
@@ -338,7 +349,6 @@ export class GrandHallScene extends Phaser.Scene {
 
     this.playDialogueSequence(["There is something resting here."], () => {
       this.time.delayedCall(200, () => { // Add a small delay after dialogue finishes
-        console.log("Dialogue finished. Setting petal interactive. Current stage:", this.stage);
         this.closeupPetal.setInteractive({ useHandCursor: true }).once("pointerdown", () => this.collectFirstPetal());
         this.tweens.add({
           targets: this.closeupPetal,
@@ -354,7 +364,6 @@ export class GrandHallScene extends Phaser.Scene {
   collectFirstPetal() {
     if (this.stage !== "pedestal-view") return;
     this.stage = "petal-found";
-    console.log("collectFirstPetal called. Current stage:", this.stage);
     this.closeupPetal.disableInteractive();
     const progress = getHouseProgress();
     if (!progress.grandHall.firstPetalCollected) {
@@ -639,6 +648,7 @@ export class GrandHallScene extends Phaser.Scene {
       if (name === "bedroom" && !progress.galleryComplete) return;
       if (name === "kitchen" && !progress.bedroomComplete) return;
       if (name === "basement" && !progress.kitchenComplete) return;
+      if (name === "observatory" && !progress.basementComplete) return;
 
       hotspot.setInteractive({ useHandCursor: true })
         .on("pointerover", () => {
@@ -740,6 +750,26 @@ export class GrandHallScene extends Phaser.Scene {
     this.basementGlow.fillEllipse(width * 0.23, height * 0.64, width * 0.14, height * 0.11);
   }
 
+  updateObservatoryGlow() {
+    if (!this.hubUnlocked || !this.observatoryGlow) {
+      if (this.observatoryGlow) this.observatoryGlow.clear();
+      return;
+    }
+    const progress = getHouseProgress();
+    if (!progress.basementComplete) {
+      this.observatoryGlow.clear();
+      return;
+    }
+    const { width, height } = this.scale;
+    const pulse = 0.5 + Math.sin(this.time.now * 0.004) * 0.5;
+    const gold = progress.observatoryComplete;
+    const baseColor = gold ? 0xffd56a : 0xdfe8ff;
+    const hoverBoost = this.hoveredRoom === "observatory" ? 0.25 : (gold ? 0.19 : 0.14);
+    this.observatoryGlow.clear();
+    this.observatoryGlow.fillStyle(baseColor, hoverBoost + pulse * 0.14);
+    this.observatoryGlow.fillEllipse(width * 0.77, height * 0.64, width * 0.15, height * 0.11);
+  }
+
   enterRoom(name) {
     if (!this.hubUnlocked) return;
     const progress = getHouseProgress();
@@ -807,6 +837,20 @@ export class GrandHallScene extends Phaser.Scene {
       }
       this.cameras.main.fadeOut(900, 0, 0, 0);
       this.time.delayedCall(950, () => this.scene.start("BasementScene"));
+      return;
+    }
+
+    if (name === "observatory") {
+      if (!progress.basementComplete) {
+        this.playDialogueSequence(["The observatory can wait.", "The basement comes first."]);
+        return;
+      }
+      if (progress.observatoryComplete) {
+        this.playDialogueSequence(["The observatory shines above the manor.", "Tomorrow waits there."]);
+        return;
+      }
+      this.cameras.main.fadeOut(900, 0, 0, 0);
+      this.time.delayedCall(950, () => this.scene.start("ObservatoryScene"));
       return;
     }
 

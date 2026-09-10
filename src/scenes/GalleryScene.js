@@ -2,7 +2,7 @@
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
 
-const DEBUG_HOTSPOTS = true;
+const DEBUG_HOTSPOTS = false;
 
 const FRAME_HOTSPOTS = { 
   1: { x: 0.14, y: 0.34, w: 0.15, h: 0.2 },

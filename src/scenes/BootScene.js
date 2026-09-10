@@ -4,6 +4,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    this.createLoadingScreen();
+
     this.load.image("menuBackground", "assets/images/main-menu-bg.png");
     this.load.image("introDriveReference", "assets/images/intro-drive-reference.png");
     this.load.image("graveyardBackground", "assets/images/graveyard-bg.png");
@@ -69,7 +71,78 @@ export class BootScene extends Phaser.Scene {
     this.load.image("floodedChamber", "assets/images/Flooded chamber.png");
     this.load.image("mirrorFragment", "assets/images/Mirror fragment.png");
     this.load.image("crestEndurance", "assets/images/Crest of endurance.png");
+    this.load.image("observatoryStaircase", "assets/images/Observatory Staircase.png");
+    this.load.image("observatoryUnrestored", "assets/images/Observatory unrestored.png");
+    this.load.image("observatoryRestored", "assets/images/Observatory Restored.png");
+    this.load.image("telescopeCloseup", "assets/images/Telescope closeup.png");
+    this.load.image("orreryCloseup", "assets/images/Orerry closeup.png");
+    this.load.image("starChartCloseup", "assets/images/Celestial Chart.png");
+    this.load.image("celestialMechanism", "assets/images/celestial mechanism.png");
+    this.load.image("crimsonRose", "assets/images/crimson rose.png");
+    this.load.image("crestTomorrow", "assets/images/crest of tomorrow.png");
 
+  }
+
+  createLoadingScreen() {
+    const { width, height } = this.scale;
+    const barWidth = Math.min(width * 0.52, 560);
+    const barY = height * 0.58;
+
+    this.cameras.main.setBackgroundColor("#050507");
+
+    const title = this.add.text(width / 2, height * 0.41, "THE HOUSE OF MEMORIES", {
+      fontFamily: "Georgia, 'Times New Roman', serif",
+      fontSize: `${Math.max(28, Math.min(52, width * 0.045))}px`,
+      color: "#d9c0a0",
+      align: "center",
+      stroke: "#12090c",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    title.setShadow(0, 0, "#8f2f35", 14, true, true);
+
+    const subtitle = this.add.text(width / 2, height * 0.49, "Loading memories...", {
+      fontFamily: "Georgia, 'Times New Roman', serif",
+      fontSize: `${Math.max(14, Math.min(21, width * 0.018))}px`,
+      color: "#9f8265",
+      align: "center"
+    }).setOrigin(0.5);
+
+    const barBack = this.add.rectangle(width / 2, barY, barWidth, 10, 0x160d11, 0.96)
+      .setStrokeStyle(1, 0x735a44, 0.88);
+
+    const barFill = this.add.rectangle(width / 2 - barWidth / 2, barY, 1, 8, 0xd8b28d, 0.94)
+      .setOrigin(0, 0.5);
+
+    const percent = this.add.text(width / 2, height * 0.64, "0%", {
+      fontFamily: "Georgia, 'Times New Roman', serif",
+      fontSize: `${Math.max(12, Math.min(17, width * 0.014))}px`,
+      color: "#6f5945",
+      align: "center"
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: subtitle,
+      alpha: { from: 0.55, to: 1 },
+      duration: 1400,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+
+    this.load.on("progress", (value) => {
+      barFill.displayWidth = Math.max(1, barWidth * value);
+      percent.setText(`${Math.round(value * 100)}%`);
+    });
+
+    this.load.on("complete", () => {
+      barFill.displayWidth = barWidth;
+      percent.setText("Ready");
+    });
+
+    this.load.on("loaderror", (file) => {
+      console.warn("[HOUSE] Asset failed to load:", file.key, file.src);
+    });
   }
 
   create() {
@@ -77,10 +150,10 @@ export class BootScene extends Phaser.Scene {
       Promise.race([
         document.fonts.ready,
         new Promise((resolve) => window.setTimeout(resolve, 1200))
-      ]).then(() => this.scene.start("BedroomScene"));
+      ]).then(() => this.scene.start("MainMenuScene"));
       return;
     }
 
-    this.scene.start("BedroomScene");
+    this.scene.start("MainMenuScene");
   }
 }
