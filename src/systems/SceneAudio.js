@@ -17,12 +17,13 @@ export class SceneAudio {
 
   start() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext || this.started) return;
+    const phaserContext = this.scene?.sound?.context || this.scene?.game?.sound?.context;
+    if ((!AudioContext && !phaserContext) || this.started) return;
 
     void resumeGameAudio(this.scene);
     startBackgroundMusic(this.scene);
 
-    this.context = window.__houseAudioContext || new AudioContext();
+    this.context = window.__houseAudioContext || phaserContext || new AudioContext();
     window.__houseAudioContext = this.context;
     this.rainGain = this.context.createGain();
     this.thunderGain = this.context.createGain();

@@ -1,5 +1,6 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const LETTER_TEXT = `To the One I Have Been Waiting For,
 
@@ -60,19 +61,24 @@ this.createVignette();
 this.dialogue = new DialogueBox(this);
 this.dialogue.create();
 
-this.input.keyboard.on("keydown-L", () => this.openLetter());
-this.input.keyboard.on("keydown-M", () => this.inspectMirror());
-this.input.keyboard.on("keydown-W", () => this.inspectWindshield());
-
-this.input.keyboard.on("keydown-ESC", () => {
-this.closeLetter();
-});
+this.onKeyLetter = () => this.openLetter();
+this.onKeyMirror = () => this.inspectMirror();
+this.onKeyWindshield = () => this.inspectWindshield();
+this.onKeyEscape = () => this.closeLetter();
+this.input.keyboard.on("keydown-L", this.onKeyLetter);
+this.input.keyboard.on("keydown-M", this.onKeyMirror);
+this.input.keyboard.on("keydown-W", this.onKeyWindshield);
+this.input.keyboard.on("keydown-ESC", this.onKeyEscape);
 
 this.time.delayedCall(3000, () => this.showObjectiveHint());
 
 this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
 this.dialogue?.destroy();
 if (this.audio) this.audio.destroy();
+this.input.keyboard.off("keydown-L", this.onKeyLetter);
+this.input.keyboard.off("keydown-M", this.onKeyMirror);
+this.input.keyboard.off("keydown-W", this.onKeyWindshield);
+this.input.keyboard.off("keydown-ESC", this.onKeyEscape);
 });
 }
 
@@ -575,6 +581,6 @@ this.letterOpen = false;
   }
 
   finishScene() {
-    this.scene.start("GraveyardScene");
+    fadeToScene(this, "GraveyardScene", {}, 600);
   }
 }

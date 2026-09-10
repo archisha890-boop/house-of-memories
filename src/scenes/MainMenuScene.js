@@ -272,24 +272,14 @@ export class MainMenuScene extends Phaser.Scene {
 
     if (MENU_ITEMS[this.selectedIndex].sceneLabel === "IntroDriveScene") {
       resetProgress();
-      window.__houseIntroAudioArmed = true;
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext && !window.__houseAudioContext) {
-        window.__houseAudioContext = new AudioContext();
-      }
-      if (window.__houseAudioContext && window.__houseAudioContext.resume) {
-        void window.__houseAudioContext.resume();
-      }
-      void resumeGameAudio(this);
-      startBackgroundMusic(this);
+      this.armGameAudio();
       fadeToScene(this, "IntroDriveScene", {}, 1400);
       return;
     }
 
     if (MENU_ITEMS[this.selectedIndex].sceneLabel === "Continue") {
       const progress = getHouseProgress();
-      void resumeGameAudio(this);
-      startBackgroundMusic(this);
+      this.armGameAudio();
       const hasReachedHall = Boolean(
         progress.grandHall?.hubUnlocked ||
         progress.libraryComplete ||
@@ -313,6 +303,19 @@ export class MainMenuScene extends Phaser.Scene {
     fadeToScene(this, "PlaceholderScene", {
       label: MENU_ITEMS[this.selectedIndex].sceneLabel
     }, 450);
+  }
+
+  armGameAudio() {
+    window.__houseIntroAudioArmed = true;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext && !window.__houseAudioContext) {
+      window.__houseAudioContext = new AudioContext();
+    }
+    if (window.__houseAudioContext?.resume) {
+      void window.__houseAudioContext.resume();
+    }
+    void resumeGameAudio(this);
+    startBackgroundMusic(this);
   }
 
   handleResize() {

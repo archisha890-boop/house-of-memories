@@ -1,5 +1,6 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const LETTER_NAME = "Invitation Letter";
 
@@ -45,14 +46,18 @@ export class GraveyardScene extends Phaser.Scene {
     this.dialogue = new DialogueBox(this);
     this.dialogue.create();
 
-    this.input.keyboard.on("keydown-I", () => this.toggleInventory());
-    this.input.keyboard.on("keydown-ENTER", () => {
+    this.onKeyInventory = () => this.toggleInventory();
+    this.onKeyEnter = () => {
       if (this.canEnter) this.endScene();
-    });
+    };
+    this.input.keyboard.on("keydown-I", this.onKeyInventory);
+    this.input.keyboard.on("keydown-ENTER", this.onKeyEnter);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
+      this.input.keyboard.off("keydown-I", this.onKeyInventory);
+      this.input.keyboard.off("keydown-ENTER", this.onKeyEnter);
     });
   }
 
@@ -547,7 +552,7 @@ export class GraveyardScene extends Phaser.Scene {
         fontSize: `${Math.max(22, Math.floor(width / 42))}px`,
         color: "#f1d9bb"
       }).setOrigin(0.5).setDepth(100);
-      this.time.delayedCall(2000, () => this.scene.start("GrandHallScene"));
+      this.time.delayedCall(2000, () => fadeToScene(this, "GrandHallScene", {}, 500));
     });
   }
 
