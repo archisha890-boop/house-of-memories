@@ -1,6 +1,7 @@
 ﻿import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const DEBUG_HOTSPOTS = false;
 
@@ -60,6 +61,7 @@ export class GalleryScene extends Phaser.Scene {
     this.stage = progress.galleryComplete ? "complete-view" : "intro";
     this.hoveredFrame = null;
     this.hoveredInteract = null;
+    this.puzzleControls = [];
 
     this.cameras.main.setBackgroundColor("#000000");
     this.cameras.main.fadeIn(1500, 0, 0, 0);
@@ -97,7 +99,9 @@ export class GalleryScene extends Phaser.Scene {
       logProgressEvent("SCENE END", { scene: "GalleryScene", stage: this.stage, petals: this.rosePetalCount, crests: this.memoryCrestCount });
       this.autosave();
       if (this.audio) this.audio.destroy();
-      if (this.dialogue) this.dialogue.hide();
+      this.clearPuzzleControls();
+      this.clearFragmentHotspots();
+      this.dialogue?.destroy();
       if (this.inventoryText) this.inventoryText.destroy();
       if (this.clockText) this.clockText.destroy();
       if (this.frameGlow) this.frameGlow.clear();
@@ -489,7 +493,9 @@ export class GalleryScene extends Phaser.Scene {
 
   clearPuzzleControls() {
     if (!this.puzzleControls) return;
-    this.puzzleControls.forEach((c) => c.destroy());
+    this.puzzleControls.forEach((c) => {
+      if (c && c.active && c.destroy) c.destroy();
+    });
     this.puzzleControls = [];
   }
 
@@ -562,11 +568,12 @@ export class GalleryScene extends Phaser.Scene {
     frame.setScale(this.imageScale(frame, 0.38, 0.42));
     this.frameOneView.add(frame);
 
-    this.add.text(width / 2, height * 0.1, "THE BROKEN PHOTOGRAPH", {
+    const title = this.add.text(width / 2, height * 0.1, "THE BROKEN PHOTOGRAPH", {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(17, Math.floor(width / 54))}px`,
       color: "#d8b28d"
     }).setOrigin(0.5).setDepth(63);
+    this.frameOneView.add(title);
 
     this.photoOrder = [...PHOTO_START];
     this.photoSolved = false;
@@ -706,11 +713,12 @@ export class GalleryScene extends Phaser.Scene {
     frame.setScale(this.imageScale(frame, 0.34, 0.38));
     this.frameTwoView.add(frame);
 
-    this.add.text(width / 2, height * 0.1, "THE ORDER OF MOMENTS", {
+    const title = this.add.text(width / 2, height * 0.1, "THE ORDER OF MOMENTS", {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(17, Math.floor(width / 54))}px`,
       color: "#d8b28d"
     }).setOrigin(0.5).setDepth(63);
+    this.frameTwoView.add(title);
 
     this.memoryOrder = [...MEMORY_START];
     this.memorySolved = false;
@@ -725,13 +733,14 @@ export class GalleryScene extends Phaser.Scene {
 
     this.memoryOrder.forEach((label, index) => {
       const y = startY + index * gap;
-      this.add.text(width * 0.32, y, `${index + 1}. ${label}`, {
+      const rowLabel = this.add.text(width * 0.32, y, `${index + 1}. ${label}`, {
         fontFamily: "IM Fell English SC, Georgia, serif",
         fontSize: `${Math.max(13, Math.floor(width / 78))}px`,
         color: "#f1d9bb",
         backgroundColor: "#1a120f",
         padding: { x: 10, y: 6 }
       }).setOrigin(0, 0.5).setDepth(63);
+      this.addPuzzleControl(rowLabel);
       this.makePuzzleButton(width * 0.72, y, "â–²", () => this.moveMemory(index, -1), 14);
       this.makePuzzleButton(width * 0.82, y, "â–¼", () => this.moveMemory(index, 1), 14);
     });
@@ -780,11 +789,12 @@ export class GalleryScene extends Phaser.Scene {
     frame.setScale(this.imageScale(frame, 0.34, 0.38));
     this.frameThreeView.add(frame);
 
-    this.add.text(width / 2, height * 0.1, "THE MISSING TITLE", {
+    const title = this.add.text(width / 2, height * 0.1, "THE MISSING TITLE", {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(17, Math.floor(width / 54))}px`,
       color: "#d8b28d"
     }).setOrigin(0.5).setDepth(63);
+    this.frameThreeView.add(title);
 
     const startX = width * 0.28;
     const gap = width * 0.24;
@@ -873,6 +883,7 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   exitSketchRoom(fromComplete = false) {
+    this.clearPuzzleControls();
     if (this.sketchView) {
       this.sketchView.destroy();
       this.sketchView = null;
@@ -962,9 +973,12 @@ export class GalleryScene extends Phaser.Scene {
       img.setScale(this.imageScale(img, 0.55, 0.65));
       this.mirrorView.add(img);
       this.playDialogueSequence(["You..."], () => {
+        const view = this.mirrorView;
         this.mirrorStep = 2;
-        this.mirrorView = null;
-        this.time.delayedCall(900, () => this.showMirrorStep());
+        this.closeView(view, () => {
+          if (this.mirrorView === view) this.mirrorView = null;
+          this.time.delayedCall(900, () => this.showMirrorStep());
+        });
       }, [800]);
       return;
     }
@@ -1133,10 +1147,7 @@ export class GalleryScene extends Phaser.Scene {
     this.finalReturnStarted = true;
     this.autosave();
     this.playDialogueSequence(["The house remembers."], () => {
-      this.cameras.main.fadeOut(1400, 0, 0, 0);
-      this.time.delayedCall(1500, () => {
-        this.scene.start("GrandHallScene", { fromGallery: true });
-      });
+      fadeToScene(this, "GrandHallScene", { fromGallery: true }, 1400);
     }, [800]);
   }
 

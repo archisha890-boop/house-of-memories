@@ -51,6 +51,7 @@ export class GraveyardScene extends Phaser.Scene {
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
     });
   }
@@ -278,7 +279,6 @@ export class GraveyardScene extends Phaser.Scene {
       onComplete: () => {
         this.vision.setDepth(72);
         this.vision.setAlpha(1);
-        this.playPianoChord();
         this.tweens.add({
           targets: this.bloom,
           alpha: 0,
@@ -308,28 +308,6 @@ export class GraveyardScene extends Phaser.Scene {
           this.startInventoryPulse(true);
         });
       }
-    });
-  }
-
-  playPianoChord() {
-    if (!window.__houseAudioContext) return;
-    const context = window.__houseAudioContext;
-    const gain = context.createGain();
-    gain.gain.value = 0.04;
-    gain.connect(context.destination);
-
-    [196, 246.94, 293.66].forEach((frequency) => {
-      const osc = context.createOscillator();
-      const noteGain = context.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = frequency;
-      noteGain.gain.setValueAtTime(0, context.currentTime);
-      noteGain.gain.linearRampToValueAtTime(0.32, context.currentTime + 0.06);
-      noteGain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 2.2);
-      osc.connect(noteGain);
-      noteGain.connect(gain);
-      osc.start();
-      osc.stop(context.currentTime + 2.3);
     });
   }
 

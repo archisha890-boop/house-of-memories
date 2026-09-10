@@ -80,6 +80,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image("celestialMechanism", "assets/images/celestial mechanism.png");
     this.load.image("crimsonRose", "assets/images/crimson rose.png");
     this.load.image("crestTomorrow", "assets/images/crest of tomorrow.png");
+    this.load.image("greenhouseFinalInterior", "assets/images/greenhouse_final_interior.png.png");
+    this.load.image("realWorldBedroom", "assets/images/real_world_bedroom.png.png");
+    this.load.image("finalPhoto", "assets/images/final_photo.png.png");
+    this.load.image("greenhouseFinal", "assets/images/greenhouse_final.png.png");
+    this.load.audio("finaleTheme", "assets/soundtrack/sonican-ambient-piano-loop-no2-ethereal-mystery-591785.mp3");
 
   }
 

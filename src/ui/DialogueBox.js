@@ -37,10 +37,14 @@ export class DialogueBox {
     this.group.addMultiple([this.text, this.prompt, this.skipButton]);
     this.hide();
 
-    this.scene.input.on("pointerdown", () => this.advance());
-    this.scene.input.keyboard.on("keydown-SPACE", () => this.advance());
-    this.scene.input.keyboard.on("keydown-ENTER", () => this.advance());
-    this.scene.input.keyboard.on("keydown-ESC", () => this.skip());
+    this.onPointerDown = () => this.advance();
+    this.onSpace = () => this.advance();
+    this.onEnter = () => this.advance();
+    this.onEscape = () => this.skip();
+    this.scene.input.on("pointerdown", this.onPointerDown);
+    this.scene.input.keyboard.on("keydown-SPACE", this.onSpace);
+    this.scene.input.keyboard.on("keydown-ENTER", this.onEnter);
+    this.scene.input.keyboard.on("keydown-ESC", this.onEscape);
   }
 
   show(message, onClose = null) {
@@ -116,5 +120,15 @@ export class DialogueBox {
     this.panel.strokeRect(x, y, w, h);
     this.panel.lineStyle(1, 0xc3a06f, 0.45);
     this.panel.strokeRect(x + 6, y + 6, w - 12, h - 12);
+  }
+
+  destroy() {
+    this.scene.input.off("pointerdown", this.onPointerDown);
+    this.scene.input.keyboard.off("keydown-SPACE", this.onSpace);
+    this.scene.input.keyboard.off("keydown-ENTER", this.onEnter);
+    this.scene.input.keyboard.off("keydown-ESC", this.onEscape);
+    this.group?.clear(true, true);
+    this.group?.destroy();
+    this.panel?.destroy();
   }
 }

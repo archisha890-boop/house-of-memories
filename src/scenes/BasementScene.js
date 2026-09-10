@@ -1,6 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const TEXTURES = {
   door: "basementDoor",
@@ -71,6 +72,7 @@ export class BasementScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       logProgressEvent("SCENE END", { scene: "BasementScene", stage: this.stage, petals: this.rosePetalCount, crests: this.memoryCrestCount });
       this.autosave();
+      this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
       this.scale.off("resize", this.resizeScene, this);
     });
@@ -639,8 +641,7 @@ export class BasementScene extends Phaser.Scene {
       return;
     }
     this.autosave();
-    this.cameras.main.fadeOut(1000, 0, 0, 0);
-    this.time.delayedCall(1050, () => this.scene.start("GrandHallScene", { fromBasement: true }));
+    fadeToScene(this, "GrandHallScene", { fromBasement: true }, 1000);
   }
 
   updateRoomWarmth() {
@@ -703,7 +704,7 @@ export class BasementScene extends Phaser.Scene {
   showQuestBanner(text, onComplete) {
     const { width, height } = this.scale;
     const banner = this.add.container(0, 0).setDepth(74).setAlpha(0);
-    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.76).setOrigin(0);
+    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.76).setOrigin(0).setInteractive({ useHandCursor: true });
     const bannerText = this.add.text(width / 2, height / 2, text, {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(18, Math.floor(width / 48))}px`,
@@ -713,9 +714,17 @@ export class BasementScene extends Phaser.Scene {
       backgroundColor: "#0a0808",
       padding: { x: 18, y: 14 }
     }).setOrigin(0.5);
-    banner.add([shade, bannerText]);
+    const prompt = this.add.text(width / 2, height * 0.68, "Click to continue", {
+      fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(12, Math.floor(width / 92))}px`,
+      color: "#c6a27f"
+    }).setOrigin(0.5);
+    banner.add([shade, bannerText, prompt]);
     this.tweens.add({ targets: banner, alpha: 1, duration: 500 });
-    this.input.once("pointerdown", () => {
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
       this.tweens.add({
         targets: banner,
         alpha: 0,
@@ -725,7 +734,9 @@ export class BasementScene extends Phaser.Scene {
           if (onComplete) onComplete();
         }
       });
-    });
+    };
+    shade.once("pointerdown", dismiss);
+    this.input.keyboard.once("keydown-ENTER", dismiss);
   }
 
   playDialogueSequence(lines, onComplete = null) {

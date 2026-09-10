@@ -1,6 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const TEXTURE_KEYS = {
   background: "bedroom",
@@ -32,6 +33,8 @@ export class BedroomScene extends Phaser.Scene {
     this.stage = "intro";
     this.hoveredHotspot = null;
     this.busy = false;
+    this.returnStarted = false;
+    this.crestRevealStarted = false;
   }
 
   create() {
@@ -43,6 +46,8 @@ export class BedroomScene extends Phaser.Scene {
     this.memoryCrestCount = this.progress.memoryCrests || 0;
     this.hoveredHotspot = null;
     this.busy = false;
+    this.returnStarted = false;
+    this.crestRevealStarted = false;
 
     logProgressEvent("SCENE START", { scene: "BedroomScene", progress: this.progress });
 
@@ -73,7 +78,7 @@ export class BedroomScene extends Phaser.Scene {
     if (this.bedroomState.bedroomComplete || this.progress.bedroomComplete) {
       this.setupCompleteView();
     } else {
-      this.time.delayedCall(800, () => this.playIntro());
+      this.time.delayedCall(800, () => this.resumeBedroomState());
     }
 
     this.bindShutdown();
@@ -93,6 +98,7 @@ export class BedroomScene extends Phaser.Scene {
         stage: this.stage
       });
       this.autosave();
+      this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
       this.scale.off("resize", this.resizeScene, this);
     });
@@ -213,7 +219,6 @@ export class BedroomScene extends Phaser.Scene {
 
   playIntro() {
     this.stage = "intro";
-    this.playSoftLaugh();
     this.playDialogueSequence([
       "...",
       "This was hers.",
@@ -225,20 +230,22 @@ export class BedroomScene extends Phaser.Scene {
     ], () => this.enableExploration());
   }
 
-  playSoftLaugh() {
-    if (!window.__houseAudioContext) return;
-    const context = window.__houseAudioContext;
-    const osc = context.createOscillator();
-    const gain = context.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 740;
-    gain.gain.setValueAtTime(0, context.currentTime);
-    gain.gain.linearRampToValueAtTime(0.018, context.currentTime + 0.15);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 1.4);
-    osc.connect(gain);
-    gain.connect(context.destination);
-    osc.start();
-    osc.stop(context.currentTime + 1.5);
+  resumeBedroomState() {
+    if (this.bedroomState.crestCollected && !this.bedroomState.finalPetalCollected) {
+      this.background.setTexture(TEXTURE_KEYS.restored);
+      this.coverImage(this.background);
+      this.playDialogueSequence(["A final petal rests on the bed."], () => this.showFinalPetal());
+      return;
+    }
+
+    if (this.bedroomState.chestUnlocked || this.getKeepsakesCollected() === 5) {
+      this.stage = "explore";
+      this.enableExploration();
+      this.playDialogueSequence(["The chest is waiting."], () => {});
+      return;
+    }
+
+    this.playIntro();
   }
 
   enableExploration() {
@@ -508,12 +515,14 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   completeBedroom() {
+    if (this.stage === "restoring" || this.crestRevealStarted) return;
     if (this.bedroomState.crestCollected) {
       this.showFinalPetal();
       return;
     }
 
     this.stage = "restoring";
+    this.busy = true;
     this.restoredBackground = this.add.image(0, 0, TEXTURE_KEYS.restored)
       .setOrigin(0.5)
       .setDepth(1)
@@ -528,6 +537,8 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   revealCrest() {
+    if (this.crestRevealStarted || this.bedroomState.crestCollected) return;
+    this.crestRevealStarted = true;
     const { width, height } = this.scale;
     const crest = this.add.image(width / 2, height * 0.4, TEXTURE_KEYS.crest)
       .setOrigin(0.5)
@@ -667,6 +678,8 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   returnToGrandHall() {
+    if (this.returnStarted) return;
+    this.returnStarted = true;
     this.bedroomState.bedroomComplete = true;
     this.progress.bedroomComplete = true;
     this.progress.chapterFiveUnlocked = true;
@@ -674,15 +687,14 @@ export class BedroomScene extends Phaser.Scene {
     logProgressEvent("BEDROOM COMPLETE", { petals: this.rosePetalCount, crests: this.memoryCrestCount });
 
     this.playDialogueSequence(["The house remembers."], () => {
-      this.cameras.main.fadeOut(1000, 0, 0, 0);
-      this.time.delayedCall(1050, () => this.scene.start("GrandHallScene", { fromBedroom: true }));
+      fadeToScene(this, "GrandHallScene", { fromBedroom: true }, 1000);
     });
   }
 
   showQuestBanner(text, onComplete) {
     const { width, height } = this.scale;
     const banner = this.add.container(0, 0).setDepth(72).setAlpha(0);
-    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.76).setOrigin(0);
+    const shade = this.add.rectangle(0, 0, width, height, 0x020202, 0.76).setOrigin(0).setInteractive({ useHandCursor: true });
     const bannerText = this.add.text(width / 2, height / 2, text, {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(18, Math.floor(width / 48))}px`,
@@ -692,10 +704,18 @@ export class BedroomScene extends Phaser.Scene {
       backgroundColor: "#0a0808",
       padding: { x: 18, y: 14 }
     }).setOrigin(0.5);
-    banner.add([shade, bannerText]);
+    const prompt = this.add.text(width / 2, height * 0.68, "Click to continue", {
+      fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(12, Math.floor(width / 92))}px`,
+      color: "#c6a27f"
+    }).setOrigin(0.5);
+    banner.add([shade, bannerText, prompt]);
     this.tweens.add({ targets: banner, alpha: 1, duration: 500 });
 
-    this.input.once("pointerdown", () => {
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
       this.tweens.add({
         targets: banner,
         alpha: 0,
@@ -705,7 +725,9 @@ export class BedroomScene extends Phaser.Scene {
           if (onComplete) onComplete();
         }
       });
-    });
+    };
+    shade.once("pointerdown", dismiss);
+    this.input.keyboard.once("keydown-ENTER", dismiss);
   }
 
   playDialogueSequence(lines, onComplete = null) {

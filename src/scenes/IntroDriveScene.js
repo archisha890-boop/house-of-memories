@@ -71,6 +71,7 @@ this.closeLetter();
 this.time.delayedCall(3000, () => this.showObjectiveHint());
 
 this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+this.dialogue?.destroy();
 if (this.audio) this.audio.destroy();
 });
 }

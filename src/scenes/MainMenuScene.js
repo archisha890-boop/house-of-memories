@@ -1,5 +1,10 @@
 ﻿import { Atmosphere } from "../systems/Atmosphere.js";
 
+import { resumeGameAudio, startBackgroundMusic } from "../systems/BackgroundMusic.js";
+
+import { getHouseProgress, resetProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
+
 const MENU_ITEMS = [
   { label: "New Game", sceneLabel: "IntroDriveScene" },
   { label: "Continue", sceneLabel: "Continue" },
@@ -25,14 +30,22 @@ export class MainMenuScene extends Phaser.Scene {
     this.atmosphere = new Atmosphere(this);
     this.atmosphere.create();
 
-    this.input.keyboard.on("keydown-UP", () => this.moveSelection(-1));
-    this.input.keyboard.on("keydown-DOWN", () => this.moveSelection(1));
-    this.input.keyboard.on("keydown-ENTER", () => this.chooseSelection());
-    this.input.keyboard.on("keydown-SPACE", () => this.chooseSelection());
+    this.onKeyUp = () => this.moveSelection(-1);
+    this.onKeyDown = () => this.moveSelection(1);
+    this.onKeyEnter = () => this.chooseSelection();
+    this.onKeySpace = () => this.chooseSelection();
+    this.input.keyboard.on("keydown-UP", this.onKeyUp);
+    this.input.keyboard.on("keydown-DOWN", this.onKeyDown);
+    this.input.keyboard.on("keydown-ENTER", this.onKeyEnter);
+    this.input.keyboard.on("keydown-SPACE", this.onKeySpace);
 
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off("resize", this.handleResize, this);
+      this.input.keyboard.off("keydown-UP", this.onKeyUp);
+      this.input.keyboard.off("keydown-DOWN", this.onKeyDown);
+      this.input.keyboard.off("keydown-ENTER", this.onKeyEnter);
+      this.input.keyboard.off("keydown-SPACE", this.onKeySpace);
     });
 
     this.updateSelection();
@@ -254,27 +267,52 @@ export class MainMenuScene extends Phaser.Scene {
     this.activeMarker.strokePath();
   }
 
-  async chooseSelection() {
+  chooseSelection() {
+    if (this.__houseTransitionStarted) return;
+
     if (MENU_ITEMS[this.selectedIndex].sceneLabel === "IntroDriveScene") {
-      this.input.enabled = false;
-      const { resetProgress } = await import("../systems/HouseProgress.js");
       resetProgress();
-      this.cameras.main.fadeOut(1400, 0, 0, 0);
       window.__houseIntroAudioArmed = true;
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext && !window.__houseAudioContext) {
         window.__houseAudioContext = new AudioContext();
       }
       if (window.__houseAudioContext && window.__houseAudioContext.resume) {
-        window.__houseAudioContext.resume();
+        void window.__houseAudioContext.resume();
       }
-      this.time.delayedCall(1400, () => this.scene.start("IntroDriveScene"));
+      void resumeGameAudio(this);
+      startBackgroundMusic(this);
+      fadeToScene(this, "IntroDriveScene", {}, 1400);
       return;
     }
 
-    this.scene.start("PlaceholderScene", {
+    if (MENU_ITEMS[this.selectedIndex].sceneLabel === "Continue") {
+      const progress = getHouseProgress();
+      void resumeGameAudio(this);
+      startBackgroundMusic(this);
+      const hasReachedHall = Boolean(
+        progress.grandHall?.hubUnlocked ||
+        progress.libraryComplete ||
+        progress.galleryComplete ||
+        progress.bedroomComplete ||
+        progress.kitchenComplete ||
+        progress.basementComplete ||
+        progress.observatoryComplete
+      );
+
+      if (progress.gameComplete) {
+        fadeToScene(this, "FinaleScene", {}, 900);
+      } else if (hasReachedHall) {
+        fadeToScene(this, "GrandHallScene", { resumed: true }, 900);
+      } else {
+        fadeToScene(this, "IntroDriveScene", {}, 900);
+      }
+      return;
+    }
+
+    fadeToScene(this, "PlaceholderScene", {
       label: MENU_ITEMS[this.selectedIndex].sceneLabel
-    });
+    }, 450);
   }
 
   handleResize() {

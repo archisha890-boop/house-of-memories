@@ -1,6 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const TEXTURES = {
   staircase: "observatoryStaircase",
@@ -52,6 +53,7 @@ export class ObservatoryScene extends Phaser.Scene {
     logProgressEvent("SCENE START", { scene: "ObservatoryScene", progress: this.progress });
 
     this.cameras.main.setBackgroundColor("#020309");
+    this.resetCameraFraming();
     this.cameras.main.fadeIn(1200, 0, 0, 0);
 
     this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: false, creaks: true });
@@ -125,6 +127,7 @@ export class ObservatoryScene extends Phaser.Scene {
   }
 
   resizeScene() {
+    this.resetCameraFraming(this.cameras.main.zoom);
     if (this.background) this.coverImage(this.background);
     if (this.closeupImage) this.coverImage(this.closeupImage);
     if (this.mechanism) this.positionMechanism();
@@ -144,6 +147,15 @@ export class ObservatoryScene extends Phaser.Scene {
   fitImage(image, maxWidthRatio, maxHeightRatio) {
     const { width, height } = this.scale;
     return Math.min((width * maxWidthRatio) / image.width, (height * maxHeightRatio) / image.height);
+  }
+
+  resetCameraFraming(zoom = 1) {
+    const { width, height } = this.scale;
+    const camera = this.cameras.main;
+    camera.panEffect?.stop();
+    camera.setBounds(0, 0, width, height);
+    camera.setScroll(0, 0);
+    camera.setZoom(zoom);
   }
 
   createOverlays() {
@@ -220,13 +232,13 @@ export class ObservatoryScene extends Phaser.Scene {
       "The staircase rises into cold starlight.",
       "It feels far longer than the tower could possibly be."
     ], () => {
-      this.cameras.main.pan(this.scale.width / 2, this.scale.height * 0.38, 2600, "Sine.easeInOut");
+      this.resetCameraFraming();
       this.cameras.main.zoomTo(1.06, 2600);
       this.tweens.add({ targets: this.silverOverlay, alpha: 0.16, duration: 1800, yoyo: true, hold: 800 });
       this.time.delayedCall(3000, () => {
         this.cameras.main.fadeOut(1200, 0, 0, 0);
         this.time.delayedCall(1250, () => {
-          this.cameras.main.setZoom(1);
+          this.resetCameraFraming();
           this.observatoryState.entered = true;
           this.observatoryState.staircaseClimbed = true;
           this.autosave();
@@ -237,6 +249,7 @@ export class ObservatoryScene extends Phaser.Scene {
   }
 
   showMainObservatory(fromStaircase) {
+    this.resetCameraFraming();
     this.stage = "observatory";
     this.background.setTexture(this.observatoryState.observatoryComplete ? TEXTURES.restored : TEXTURES.unrestored);
     this.coverImage(this.background);
@@ -505,7 +518,9 @@ export class ObservatoryScene extends Phaser.Scene {
   startForeverStar() {
     this.stage = "forever-star";
     this.playDialogueSequence(["Look up."], () => {
-      this.cameras.main.pan(this.scale.width / 2, this.scale.height * 0.24, 1900, "Sine.easeInOut");
+      this.resetCameraFraming();
+      this.cameras.main.zoomTo(1.045, 1500, "Sine.easeInOut");
+      this.tweens.add({ targets: this.silverOverlay, alpha: 0.12, duration: 900, yoyo: true, hold: 500 });
       this.time.delayedCall(1700, () => this.revealGirlOnBalcony());
     });
   }
@@ -539,6 +554,7 @@ export class ObservatoryScene extends Phaser.Scene {
         onComplete: () => {
           star.destroy();
           if (this.ghost) this.tweens.add({ targets: this.ghost, alpha: 0, duration: 900, onComplete: () => this.ghost.destroy() });
+          this.cameras.main.zoomTo(1, 700, "Sine.easeInOut");
           this.completeConstellation(4, {
             dialogue: [],
             petalFlag: "petalNineteenCollected",
@@ -763,8 +779,7 @@ export class ObservatoryScene extends Phaser.Scene {
     if (this.mechanism) this.mechanism.setAlpha(0);
     this.constellationGraphics.clear();
     this.playDialogueSequence(["The descent is shorter.", "The manor rises back into view."], () => {
-      this.cameras.main.fadeOut(1100, 0, 0, 0);
-      this.time.delayedCall(1150, () => this.scene.start("GrandHallScene", { fromObservatory: true }));
+      fadeToScene(this, "GrandHallScene", { fromObservatory: true }, 1100);
     });
   }
 
@@ -896,7 +911,7 @@ export class ObservatoryScene extends Phaser.Scene {
   showQuestBanner(text, onComplete) {
     const { width, height } = this.scale;
     const banner = this.add.container(0, 0).setDepth(74).setAlpha(0);
-    const shade = this.add.rectangle(0, 0, width, height, 0x020209, 0.76).setOrigin(0);
+    const shade = this.add.rectangle(0, 0, width, height, 0x020209, 0.76).setOrigin(0).setInteractive({ useHandCursor: true });
     const bannerText = this.add.text(width / 2, height / 2, text, {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(18, Math.floor(width / 48))}px`,
@@ -906,9 +921,17 @@ export class ObservatoryScene extends Phaser.Scene {
       backgroundColor: "#050509",
       padding: { x: 18, y: 14 }
     }).setOrigin(0.5);
-    banner.add([shade, bannerText]);
+    const prompt = this.add.text(width / 2, height * 0.68, "Click to continue", {
+      fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
+      fontSize: `${Math.max(12, Math.floor(width / 92))}px`,
+      color: "#c6a27f"
+    }).setOrigin(0.5);
+    banner.add([shade, bannerText, prompt]);
     this.tweens.add({ targets: banner, alpha: 1, duration: 500 });
-    this.input.once("pointerdown", () => {
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
       this.tweens.add({
         targets: banner,
         alpha: 0,
@@ -918,7 +941,9 @@ export class ObservatoryScene extends Phaser.Scene {
           if (onComplete) onComplete();
         }
       });
-    });
+    };
+    shade.once("pointerdown", dismiss);
+    this.input.keyboard.once("keydown-ENTER", dismiss);
   }
 
   playDialogueSequence(lines, onComplete = null) {

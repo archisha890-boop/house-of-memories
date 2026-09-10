@@ -1,6 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 const PAGE_HOTSPOTS = {
   1: { x: 0.22, y: 0.48, w: 0.16, h: 0.18 },
@@ -88,6 +89,7 @@ export class LibraryScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       logProgressEvent("SCENE END", { scene: "LibraryScene", stage: this.stage, petals: this.rosePetalCount, crests: this.memoryCrestCount });
+      this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
     });
   }
@@ -1320,10 +1322,7 @@ export class LibraryScene extends Phaser.Scene {
       logProgressEvent("LIBRARY COMPLETE", { petals: this.rosePetalCount, crests: this.memoryCrestCount });
       this.autosaveLibrary();
 
-      this.cameras.main.fadeOut(1400, 0, 0, 0);
-      this.time.delayedCall(1500, () => {
-        this.scene.start("GrandHallScene", { fromLibrary: true });
-      });
+      fadeToScene(this, "GrandHallScene", { fromLibrary: true }, 1400);
     }, [900]);
   }
 

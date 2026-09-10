@@ -4,6 +4,21 @@ export function logProgressEvent(event, details = {}) {
   console.log(`[HOUSE] ${event}`, details);
 }
 
+export function canEnterFinale(progress) {
+  return Boolean(
+    progress &&
+    progress.memoryCrests >= 6 &&
+    progress.rosePetals >= 20 &&
+    progress.libraryComplete &&
+    progress.galleryComplete &&
+    progress.bedroomComplete &&
+    progress.kitchenComplete &&
+    progress.basementComplete &&
+    progress.observatoryComplete &&
+    progress.crimsonRoseAcquired
+  );
+}
+
 export function defaultProgress() {
   return {
     rosePetals: 0,
@@ -15,6 +30,9 @@ export function defaultProgress() {
     basementComplete: false,
     observatoryComplete: false,
     finaleUnlocked: false,
+    finaleStarted: false,
+    finaleComplete: false,
+    gameComplete: false,
     crimsonRoseAcquired: false,
     chapterFourUnlocked: false,
     chapterFiveUnlocked: false,

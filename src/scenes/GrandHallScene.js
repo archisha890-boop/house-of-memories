@@ -1,6 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
-import { getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { canEnterFinale, getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
+import { fadeToScene } from "../systems/SceneTransition.js";
 
 export class GrandHallScene extends Phaser.Scene {
   constructor() {
@@ -20,7 +21,7 @@ export class GrandHallScene extends Phaser.Scene {
   create(data = {}) {
     const progress = getHouseProgress();
     logProgressEvent("SCENE START", { scene: "GrandHallScene", data, progress });
-    if (data.fromLibrary || data.fromGallery || data.fromBedroom || data.fromKitchen || data.fromBasement || data.fromObservatory || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
+    if (data.fromLibrary || data.fromGallery || data.fromBedroom || data.fromKitchen || data.fromBasement || data.fromObservatory || data.fromFinale || progress.libraryComplete || progress.galleryComplete || progress.grandHall?.hubUnlocked) {
       this.createReturnedHub(progress, data);
       return;
     }
@@ -130,6 +131,7 @@ export class GrandHallScene extends Phaser.Scene {
   bindShutdown() {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       logProgressEvent("SCENE END", { scene: "GrandHallScene", stage: this.stage });
+      this.dialogue?.destroy();
       if (this.audio) this.audio.destroy();
     });
   }
@@ -145,6 +147,11 @@ export class GrandHallScene extends Phaser.Scene {
 
   showReturnedHubObjectives() {
     const { width, height } = this.scale;
+    const progress = getHouseProgress();
+    if (this.isFinaleReady(progress)) {
+      this.hubObjectives = this.add.text(width * 0.5, height * 0.14, "", {}).setAlpha(0);
+      return;
+    }
     this.hubObjectives = this.add.text(width * 0.5, height * 0.14, "RECOVER THE SIX MEMORY CRESTS\nRESTORE THE CRIMSON ROSE\nFIND HER", {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(15, Math.floor(width / 78))}px`,
@@ -158,6 +165,8 @@ export class GrandHallScene extends Phaser.Scene {
 
   createGateCrestLabel() {
     const { width, height } = this.scale;
+    const progress = getHouseProgress();
+    const ready = this.isFinaleReady(progress);
     this.gateCrestLabel = this.add.text(width * 0.5, height * 0.62, `Memory Crests\n${this.memoryCrestCount} / 6`, {
       fontFamily: "Cinzel Decorative, Georgia, Times New Roman, serif",
       fontSize: `${Math.max(14, Math.floor(width / 82))}px`,
@@ -165,7 +174,38 @@ export class GrandHallScene extends Phaser.Scene {
       align: "center",
       shadow: { offsetX: 2, offsetY: 2, color: "#0a1a0c", blur: 0, fill: true }
     }).setOrigin(0.5).setDepth(56).setAlpha(0);
+    if (ready) {
+      this.gateCrestLabel.setText(progress.gameComplete ? "THE GREENHOUSE\nAt rest" : "THE GREENHOUSE\nOne room remains");
+      this.gateCrestLabel.setColor("#d9e8c7");
+    }
     this.tweens.add({ targets: this.gateCrestLabel, alpha: 1, duration: 1000, delay: 600 });
+    if (ready && !progress.gameComplete) this.enableFinaleEntrance();
+  }
+
+  isFinaleReady(progress) {
+    return canEnterFinale(progress);
+  }
+
+  enableFinaleEntrance() {
+    this.stage = "finale-ready";
+    this.gateHotspot.setInteractive({ useHandCursor: true })
+      .on("pointerover", () => { this.gateHovering = true; })
+      .on("pointerout", () => { this.gateHovering = false; })
+      .once("pointerdown", () => {
+        const progress = getHouseProgress();
+        progress.finaleStarted = true;
+        saveProgress();
+        this.audio?.fadeOut();
+        fadeToScene(this, "FinaleScene", {}, 1100);
+      });
+
+    this.time.delayedCall(1100, () => {
+      this.playDialogueSequence([
+        "The house is whole again.",
+        "So why does it still feel empty?",
+        "Maybe there is one room left."
+      ]);
+    });
   }
 
   update(_, deltaMs) {
@@ -463,6 +503,14 @@ export class GrandHallScene extends Phaser.Scene {
   }
 
   updateGateGlow() {
+    if (this.stage === "finale-ready" && this.gateGlow) {
+      const { width, height } = this.scale;
+      const pulse = 0.5 + Math.sin(this.time.now * 0.003) * 0.5;
+      this.gateGlow.clear();
+      this.gateGlow.fillStyle(0xc9e8c2, (this.gateHovering ? 0.24 : 0.12) + pulse * 0.14);
+      this.gateGlow.fillEllipse(width * 0.5, height * 0.5, width * 0.3, height * 0.22);
+      return;
+    }
     if (this.libraryComplete && this.gateGlow) {
       const { width, height } = this.scale;
       const pulse = 0.5 + Math.sin(this.time.now * 0.0036) * 0.5;
@@ -524,29 +572,12 @@ export class GrandHallScene extends Phaser.Scene {
   }
 
   whisperEvent() {
-    this.playWhisperTone();
     this.playDialogueSequence([
       "Find the memories.",
       "Player turns.",
       "No one is there.",
       "Find me."
     ], () => this.unlockHub());
-  }
-
-  playWhisperTone() {
-    if (!window.__houseAudioContext) return;
-    const context = window.__houseAudioContext;
-    const osc = context.createOscillator();
-    const gain = context.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 392;
-    gain.gain.setValueAtTime(0, context.currentTime);
-    gain.gain.linearRampToValueAtTime(0.025, context.currentTime + 0.2);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 1.7);
-    osc.connect(gain);
-    gain.connect(context.destination);
-    osc.start();
-    osc.stop(context.currentTime + 1.8);
   }
 
   unlockHub() {
@@ -645,10 +676,10 @@ export class GrandHallScene extends Phaser.Scene {
   enableRooms() {
     const progress = getHouseProgress();
     Object.entries(this.roomHotspots).forEach(([name, hotspot]) => {
-      if (name === "bedroom" && !progress.galleryComplete) return;
-      if (name === "kitchen" && !progress.bedroomComplete) return;
-      if (name === "basement" && !progress.kitchenComplete) return;
-      if (name === "observatory" && !progress.basementComplete) return;
+      hotspot.removeAllListeners();
+      hotspot.disableInteractive();
+      if (this.roomLabels[name]) this.roomLabels[name].setAlpha(0);
+      if (!this.isRoomAvailable(name, progress)) return;
 
       hotspot.setInteractive({ useHandCursor: true })
         .on("pointerover", () => {
@@ -675,9 +706,27 @@ export class GrandHallScene extends Phaser.Scene {
     });
   }
 
+  getNextRoom(progress = getHouseProgress()) {
+    if (!progress.libraryComplete) return "library";
+    if (!progress.galleryComplete) return "gallery";
+    if (!progress.bedroomComplete) return "bedroom";
+    if (!progress.kitchenComplete) return "kitchen";
+    if (!progress.basementComplete) return "basement";
+    if (!progress.observatoryComplete) return "observatory";
+    return null;
+  }
+
+  isRoomAvailable(name, progress = getHouseProgress()) {
+    return this.getNextRoom(progress) === name;
+  }
+
   updateLibraryGlow() {
     if (!this.hubUnlocked || !this.libraryGlow) {
       if (this.libraryGlow) this.libraryGlow.clear();
+      return;
+    }
+    if (!this.isRoomAvailable("library")) {
+      this.libraryGlow.clear();
       return;
     }
     const { width, height } = this.scale;
@@ -696,7 +745,7 @@ export class GrandHallScene extends Phaser.Scene {
       return;
     }
     const progress = getHouseProgress();
-    if (!progress.libraryComplete) {
+    if (!this.isRoomAvailable("gallery", progress)) {
       this.galleryGlow.clear();
       return;
     }
@@ -716,7 +765,7 @@ export class GrandHallScene extends Phaser.Scene {
       return;
     }
     const progress = getHouseProgress();
-    if (!progress.bedroomComplete) {
+    if (!this.isRoomAvailable("kitchen", progress)) {
       this.kitchenGlow.clear();
       return;
     }
@@ -736,7 +785,7 @@ export class GrandHallScene extends Phaser.Scene {
       return;
     }
     const progress = getHouseProgress();
-    if (!progress.kitchenComplete) {
+    if (!this.isRoomAvailable("basement", progress)) {
       this.basementGlow.clear();
       return;
     }
@@ -756,7 +805,7 @@ export class GrandHallScene extends Phaser.Scene {
       return;
     }
     const progress = getHouseProgress();
-    if (!progress.basementComplete) {
+    if (!this.isRoomAvailable("observatory", progress)) {
       this.observatoryGlow.clear();
       return;
     }
@@ -773,14 +822,14 @@ export class GrandHallScene extends Phaser.Scene {
   enterRoom(name) {
     if (!this.hubUnlocked) return;
     const progress = getHouseProgress();
+    if (!this.isRoomAvailable(name, progress)) return;
 
     if (name === "library") {
       if (this.libraryComplete) {
         this.playDialogueSequence(["The library breathes easier now.", "Its first chapter has been restored."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("LibraryScene"));
+      fadeToScene(this, "LibraryScene", {}, 900);
       return;
     }
 
@@ -793,8 +842,7 @@ export class GrandHallScene extends Phaser.Scene {
         this.playDialogueSequence(["The gallery glows with restored memories.", "Every frame tells its story now."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("GalleryScene"));
+      fadeToScene(this, "GalleryScene", {}, 900);
       return;
     }
 
@@ -807,8 +855,7 @@ export class GrandHallScene extends Phaser.Scene {
         this.playDialogueSequence(["The bedroom rests in peace.", "Every memory has been found."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("BedroomScene"));
+      fadeToScene(this, "BedroomScene", {}, 900);
       return;
     }
 
@@ -821,8 +868,7 @@ export class GrandHallScene extends Phaser.Scene {
         this.playDialogueSequence(["The kitchen glows with warmth now.", "The fire remembers."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("KitchenScene"));
+      fadeToScene(this, "KitchenScene", {}, 900);
       return;
     }
 
@@ -835,8 +881,7 @@ export class GrandHallScene extends Phaser.Scene {
         this.playDialogueSequence(["The basement is quiet now.", "The mirror holds together."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("BasementScene"));
+      fadeToScene(this, "BasementScene", {}, 900);
       return;
     }
 
@@ -849,8 +894,7 @@ export class GrandHallScene extends Phaser.Scene {
         this.playDialogueSequence(["The observatory shines above the manor.", "Tomorrow waits there."]);
         return;
       }
-      this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.time.delayedCall(950, () => this.scene.start("ObservatoryScene"));
+      fadeToScene(this, "ObservatoryScene", {}, 900);
       return;
     }
 
