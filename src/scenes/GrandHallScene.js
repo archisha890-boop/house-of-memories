@@ -1,7 +1,7 @@
 import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { canEnterFinale, getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
-import { fadeToScene } from "../systems/SceneTransition.js";
+import { fadeToScene, revealScene } from "../systems/SceneTransition.js";
 
 export class GrandHallScene extends Phaser.Scene {
   constructor() {
@@ -38,7 +38,7 @@ export class GrandHallScene extends Phaser.Scene {
     this.chapterFourUnlocked = false;
 
     this.cameras.main.setBackgroundColor("#030202");
-    this.cameras.main.fadeIn(1200, 0, 0, 0);
+    revealScene(this, 1200);
 
     this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: true, creaks: true });
     this.audio.start();
@@ -82,7 +82,7 @@ export class GrandHallScene extends Phaser.Scene {
     logProgressEvent("SCENE START", { scene: "GrandHallScene", mode: "returned-hub", petals: this.petalCount, crests: this.memoryCrestCount });
 
     this.cameras.main.setBackgroundColor("#030202");
-    this.cameras.main.fadeIn(1400, 0, 0, 0);
+    revealScene(this, 1100);
 
     this.audio = new SceneAudio(this, { rain: false, piano: true, wind: true, thunder: true, creaks: true });
     this.audio.start();

@@ -2,7 +2,7 @@ import { DialogueBox } from "../ui/DialogueBox.js";
 import { SceneAudio } from "../systems/SceneAudio.js";
 import { canEnterFinale, getHouseProgress, logProgressEvent, saveProgress } from "../systems/HouseProgress.js";
 import { fadeBackgroundMusic, startBackgroundMusic } from "../systems/BackgroundMusic.js";
-import { fadeToScene } from "../systems/SceneTransition.js";
+import { fadeSwap, fadeToScene, revealScene, resetCameraFX } from "../systems/SceneTransition.js";
 
 const TEXTURES = {
   greenhouse: "greenhouseFinalInterior",
@@ -29,7 +29,7 @@ export class FinaleScene extends Phaser.Scene {
     this.sceneActive = true;
     logProgressEvent("SCENE START", { scene: "FinaleScene", complete: this.progress.gameComplete });
     this.cameras.main.setBackgroundColor("#050507");
-    this.cameras.main.fadeIn(1200, 0, 0, 0);
+    revealScene(this, 1200);
 
     // The supplied theme begins only once the truth starts to surface.
     this.ambience = new SceneAudio(this, { rain: true, piano: false, wind: true, thunder: false, creaks: false });

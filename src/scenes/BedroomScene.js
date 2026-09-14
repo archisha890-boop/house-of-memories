@@ -368,14 +368,13 @@ export class BedroomScene extends Phaser.Scene {
     const plushie = this.showItem(TEXTURE_KEYS.plushie, 0.32, 0.42);
     this.playDialogueSequence([
       "This little creature has witnessed",
-      "an unreasonable amount of emotional support."
+      "an unreasonable amount of emotional support.",
+      "You were jealous of the plushie."
     ], () => {
       this.finishKeepsake("plushie", "chair");
       this.awardRosePetal("plushiePetalCollected", 7, "Bedroom plushie");
-      this.playDialogueSequence(["You were jealous of the plushie."], () => {
-        this.hideItem(plushie);
-        this.afterKeepsake();
-      });
+      this.hideItem(plushie);
+      this.afterKeepsake();
     });
   }
 
@@ -403,14 +402,13 @@ export class BedroomScene extends Phaser.Scene {
       "Tiny goals.",
       "Big goals.",
       "Impossible goals.",
-      "Hopefully with him."
+      "Hopefully with him.",
+      "I always wanted you there."
     ], () => {
       this.finishKeepsake("dreamList", "mirror");
       this.awardRosePetal("dreamListPetalCollected", 8, "Bedroom dream list");
-      this.playDialogueSequence(["I always wanted you there."], () => {
-        this.hideItem(dreamList);
-        this.afterKeepsake();
-      });
+      this.hideItem(dreamList);
+      this.afterKeepsake();
     });
   }
 

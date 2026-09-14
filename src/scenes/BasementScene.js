@@ -95,13 +95,20 @@ export class BasementScene extends Phaser.Scene {
       petalFourteenCollected: false,
       petalFifteenCollected: false
     };
-    const current = this.progress.basement || {};
-    this.progress.basement = {
-      ...defaults,
-      ...current,
-      basementComplete: Boolean(current.basementComplete || this.progress.basementComplete),
-      fragments: defaults.fragments.map((value, index) => Boolean((current.fragments || [])[index] ?? value))
-    };
+    // Preserve object reference by mutating existing object instead of creating new one
+    if (!this.progress.basement) {
+      this.progress.basement = { ...defaults };
+    } else {
+      Object.keys(defaults).forEach(key => {
+        if (this.progress.basement[key] === undefined) {
+          this.progress.basement[key] = defaults[key];
+        }
+      });
+    }
+    // Synchronize completion flags
+    this.progress.basement.basementComplete = Boolean(this.progress.basement.basementComplete || this.progress.basementComplete);
+    // Normalize fragments array
+    this.progress.basement.fragments = defaults.fragments.map((value, index) => Boolean((this.progress.basement.fragments || [])[index] ?? value));
   }
 
   createBaseVisuals() {
@@ -663,6 +670,8 @@ export class BasementScene extends Phaser.Scene {
   }
 
   autosave() {
+    // Synchronize completion flags before saving
+    this.progress.basementComplete = this.progress.basementComplete || this.basementState.basementComplete;
     this.progress.basement = this.basementState;
     this.progress.rosePetals = this.rosePetalCount;
     this.progress.memoryCrests = this.memoryCrestCount;
